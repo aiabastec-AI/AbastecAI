@@ -1,0 +1,10 @@
+# Ambiente e credenciais (nunca commitar)
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel
+
+# Dependências (quando o projeto ganhar um package.json)
+node_modules
