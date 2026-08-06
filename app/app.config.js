@@ -15,8 +15,10 @@ module.exports = {
     scheme: "abastecai",
     ios: {
       supportsTablet: true,
+      bundleIdentifier: "com.abastecai.app",
     },
     android: {
+      package: "com.abastecai.app",
       adaptiveIcon: {
         backgroundColor: "#0D0F12",
         foregroundImage: "./assets/android-icon-foreground.png",

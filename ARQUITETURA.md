@@ -69,7 +69,56 @@ Criado em 2026-08-06 com `create-expo-app` (template `blank-typescript`, SDK 57)
 
 ### Pendências em aberto
 
-- [ ] **Migration SQL ainda não foi aplicada no projeto Supabase real** (`qefkolxhktkzryzcvnfq`) — o MCP conectado não tem acesso a esse projeto (conta diferente da pessoal), então precisa ser rodada manualmente pelo usuário no SQL Editor do dashboard, colando o conteúdo do arquivo de migration.
-- [ ] **Mapa ainda não renderiza de verdade.** `@rnmapbox/maps` tem código nativo — não roda no app Expo Go, e a versão web (`expo start --web`, já validada) não suporta essa lib. Pra testar o `MapView` de verdade, falta gerar um **dev client** (`npx expo prebuild` + `npx expo run:android`, ou build via EAS) — isso exige Android Studio/SDK instalado localmente (ainda não instalado nessa máquina — sem `ANDROID_HOME`/`adb`) ou build na nuvem via EAS (exige `eas login`). Decisão adiada pelo usuário em 2026-08-06; por ora seguimos sem o mapa nativo.
+- [x] **Migration SQL aplicada no projeto real** (`qefkolxhktkzryzcvnfq`) em 2026-08-06 — confirmado via query: 8 tabelas criadas, todas com RLS ativo. Como o MCP conectado não tem acesso a esse projeto (conta diferente da pessoal), foi aplicada diretamente via **Supabase Management API** (`POST /v1/projects/{ref}/database/query`), usando um Personal Access Token da conta aiabastec-AI (`SUPABASE_ACCESS_TOKEN` no `.env.local`, escopo: conta inteira, não só este projeto). Esse token fica guardado pra aplicar migrations futuras sem precisar pedir de novo — é assim que devo rodar SQL nesse projeto daqui pra frente, nunca pedindo pro usuário rodar manualmente.
+- [x] **Dev client nativo — confirmado funcionando de ponta a ponta** em 2026-08-06 (usuário viu a tela do AbastecAI rodando no emulador). Ver seção 7 abaixo pro procedimento completo.
 - [ ] Navegação entre telas (mapa, busca, ficha de posto/recarga, filtros — ver seção "Estrutura de Páginas" do PRD) ainda não existe; só tem a tela placeholder única.
 - [ ] `admin/` (Next.js) — fase 2, não é prioridade agora.
+
+## 7. Ambiente de build nativo Android (local, 2026-08-06)
+
+**O projeto foi movido de `C:\...\OneDrive\Área de Trabalho\AbastecAI` para `G:\dev\AbastecAI`.** OneDrive (sincronização + o acento em "Área de Trabalho") corrompe silenciosamente a etapa de cópia de template do `expo prebuild` — confirmado por teste A/B (mesmo projeto, mesmo comando, só funcionou fora do OneDrive). **Todo trabalho a partir de agora acontece em `G:\dev\AbastecAI`.** A pasta antiga no OneDrive foi apagada.
+
+Ferramentas instaladas nesta máquina, sem precisar de admin/instalador (tudo portátil):
+- **JDK 17 (Temurin)**: `C:\Users\gabon\dev-tools\jdk17-extracted\jdk-17.0.20+8`
+- **Android SDK**: `C:\Users\gabon\dev-tools\android-sdk` — usa a **nova CLI `android`** (não a `sdkmanager` antiga, que está deprecada nessa versão do SDK). Pacotes instalados: `platform-tools`, `platforms;android-35/36`, `build-tools;35.0.0/36.0.0`, `emulator`, `system-images;android-35;google_apis;x86_64`.
+- **Emulador**: AVD `medium_phone` (perfil de celular médio, API 36 com Play Store) já criado.
+
+Duas pegadinhas de ambiente que já foram resolvidas, documentando pra não perder tempo de novo:
+1. **Certificado do Avast**: o Avast faz inspeção SSL, e o certificado raiz dele não estava na keystore do JDK portátil, quebrando qualquer download via Java (Gradle, Maven). Corrigido importando o certificado do Windows pra dentro do cacerts do JDK (`keytool -importcert`, alias `avast-ssl-scan`). Se reinstalar o JDK, precisa refazer isso.
+2. **RN 0.86 mudou onde fica o template nativo**: `react-native` sozinho não tem mais a pasta `template/` (removida do pacote a partir da 0.86). É preciso ter `@react-native-community/template` instalado como devDependency também — já está no `package.json` do `app/`.
+
+**Env vars pra definir toda sessão nova de terminal:**
+```bash
+export ANDROID_HOME="C:\Users\gabon\dev-tools\android-sdk"
+export JAVA_HOME="C:\Users\gabon\dev-tools\jdk17-extracted\jdk-17.0.20+8"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
+```
+
+**`npx expo run:android` (rodado de dentro de `app/`) trava na etapa de instalar o APK (`installDebug`) — sempre.** O build (`assembleDebug`) sempre terminou certo (~90MB), mas a instalação via Gradle simplesmente não retorna (esperamos até 1h numa das tentativas). Causa exata não identificada — meu palpite é o daemon do Gradle enroscando ao tentar falar com o adb depois de um build longo, mas não vale mais tempo investigar já que o contorno abaixo é rápido e 100% confiável.
+
+**Procedimento que funciona, passo a passo:**
+1. Ligar o emulador sozinho, sem rodar mais nada em paralelo até ele terminar de bootar:
+   ```bash
+   "$ANDROID_HOME/cmdline-tools/latest/bin/android.exe" emulator start medium_phone
+   ```
+2. **Não tocar em adb/emulator enquanto isso roda** — comandos concorrentes atrapalham a detecção do próprio device (causou timeouts falsos várias vezes).
+3. Depois que o emulador estiver pronto, buildar (pode deixar travar na instalação e cancelar — o APK já vai ter sido gerado):
+   ```bash
+   cd app && npx expo run:android
+   ```
+4. Instalar o APK manualmente, direto via adb (rápido, nunca travou):
+   ```bash
+   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+   adb shell am start -n com.abastecai.app/.MainActivity
+   ```
+5. Subir o Metro à parte (o `run:android` que travou não deixou o dele no ar):
+   ```bash
+   npx expo start
+   ```
+6. Configurar o túnel de porta e mandar o app conectar direto no Metro (evita precisar navegar manualmente na tela do Dev Launcher):
+   ```bash
+   adb reverse tcp:8081 tcp:8081
+   adb shell am start -a android.intent.action.VIEW -d "abastecai://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+   ```
+
+Isso foi validado de ponta a ponta em 2026-08-06 — usuário confirmou a tela do AbastecAI (dark mode, indicadores ✓ Supabase/✓ Mapbox) rodando no emulador `medium_phone`.
