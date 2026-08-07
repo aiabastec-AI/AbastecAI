@@ -22,7 +22,6 @@ module.exports = {
       adaptiveIcon: {
         backgroundColor: "#0D0F12",
         foregroundImage: "./assets/android-icon-foreground.png",
-        backgroundImage: "./assets/android-icon-background.png",
         monochromeImage: "./assets/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
@@ -35,7 +34,17 @@ module.exports = {
     // em gradle.properties). O @rnmapbox/maps lê direto de
     // process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN, que o dotenv.config() acima
     // já injetou a partir do .env.local da raiz.
-    plugins: ["@rnmapbox/maps"],
+    plugins: [
+      "expo-router",
+      "@rnmapbox/maps",
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission:
+            "O AbastecAI usa sua localização pra mostrar postos e pontos de recarga próximos.",
+        },
+      ],
+    ],
     extra: {
       // Só valores seguros pro cliente: publishable key (não a secret) e o
       // token público (pk.) do Mapbox.

@@ -71,8 +71,46 @@ Criado em 2026-08-06 com `create-expo-app` (template `blank-typescript`, SDK 57)
 
 - [x] **Migration SQL aplicada no projeto real** (`qefkolxhktkzryzcvnfq`) em 2026-08-06 — confirmado via query: 8 tabelas criadas, todas com RLS ativo. Como o MCP conectado não tem acesso a esse projeto (conta diferente da pessoal), foi aplicada diretamente via **Supabase Management API** (`POST /v1/projects/{ref}/database/query`), usando um Personal Access Token da conta aiabastec-AI (`SUPABASE_ACCESS_TOKEN` no `.env.local`, escopo: conta inteira, não só este projeto). Esse token fica guardado pra aplicar migrations futuras sem precisar pedir de novo — é assim que devo rodar SQL nesse projeto daqui pra frente, nunca pedindo pro usuário rodar manualmente.
 - [x] **Dev client nativo — confirmado funcionando de ponta a ponta** em 2026-08-06 (usuário viu a tela do AbastecAI rodando no emulador). Ver seção 7 abaixo pro procedimento completo.
-- [ ] Navegação entre telas (mapa, busca, ficha de posto/recarga, filtros — ver seção "Estrutura de Páginas" do PRD) ainda não existe; só tem a tela placeholder única.
+- [x] Navegação entre telas — implementada via `expo-router` em 2026-08-06: mapa (`app/index.tsx`), busca, filtros, config, ficha de posto (`posto/[id]`) e ficha de recarga (`recarga/[id]`). Todas ainda consultam **dados mockados hardcoded** nos próprios arquivos, não o Supabase — é o próximo passo depois que a ingestão de dados estiver rodando de verdade.
+- [x] **Edge Function `sync-anp` — primeira sincronização real rodando** (ver seção 8). Cadastro de postos (nome, CNPJ, endereço, localização, distribuidora) via API Revendedores da ANP. Nota ANP (0-5) e histórico de fiscalização ainda **não** entram nessa função — não existe API pública pra isso (só CSV de fiscalização/PMQC, sem metodologia de cálculo documentada; a nota só existe dentro do app oficial "ANP com Vc – Postos", lançado em jul/2026). Fica como pendência separada.
+- [x] **Edge Function `sync-ocm` — primeira sincronização real rodando** em 2026-08-07 (ver seção 8). 1.607 pontos de recarga em todo o Brasil, 39 operadores.
+- [x] Telas do app conectadas aos dados reais do Supabase (2026-08-07) — mapa, ficha de posto e ficha de recarga.
+- [x] Cron diário rodando `sync-anp` e `sync-ocm` automaticamente (2026-08-07, ver seção 10).
+- [x] Filtros (nota mínima / tipo de conector) aplicados de ponta a ponta (2026-08-06): a tela `filtros.tsx` e o `FiltrosContext` já existiam, e a RPC (`postos_proximos`/`pontos_recarga_proximos`, migration `20260807130000_filtros_geo_rpc.sql`) já aceitava os parâmetros, mas `src/lib/postos.ts`/`recarga.ts` não os repassavam e `app/index.tsx` não lia o contexto — faltava só essa ligação. Agora `app/index.tsx` lê `useFiltros()` e recarrega os pontos (usando o último centro consultado, sem mover o mapa) toda vez que o filtro muda.
+- [ ] Normalizar o campo `uf` de `pontos_recarga` — a Open Charge Map às vezes devolve nome completo do estado ("São Paulo") em vez da sigla ("SP"), inconsistente com o padrão usado em `postos`.
 - [ ] `admin/` (Next.js) — fase 2, não é prioridade agora.
+
+## 8. ETL — Edge Function `sync-anp`
+
+Criada em 2026-08-06. Consome a **API Revendedores da ANP**, que é pública e não exige autenticação:
+`https://revendedoresapi.anp.gov.br/v1/combustivel?uf=SP&numeropagina=N` (5.000 registros/página, doc oficial: manual PDF em `gov.br/anp/.../api-revendedores-manual-usuario.pdf`).
+
+- Filtra por UF (default `SP`), pagina até o fim, faz upsert em `postos` por `cnpj`.
+- Registros sem latitude/longitude válida na fonte são **pulados**, não inseridos (a coluna `localizacao` é `NOT NULL`) — contabilizados em `registros_pulados`.
+- A API só devolve o campo `distribuidora`, sem diferenciar bandeira exibida de distribuidora real — por ora `bandeira` e `distribuidora_atual` recebem o mesmo valor.
+- Cada rodada grava uma linha em `sync_logs` (tabela criada na migration `20260806130000_sync_logs.sql`) com contagem de lidos/gravados/pulados e status — é assim que dá pra acompanhar o resultado de cada sync sem entrar no dashboard.
+- Secret da função: `PROJECT_SECRET_KEY` (a `SUPABASE_SECRET_KEY` do `.env.local`, setada via `supabase secrets set`) — nome customizado pra não colidir com o `SUPABASE_URL` que a Edge Function já recebe automaticamente.
+- Deploy feito com `supabase functions deploy sync-anp --project-ref qefkolxhktkzryzcvnfq --use-api --no-verify-jwt` — a flag `--use-api` bundla no servidor da Supabase em vez de usar Docker local (que não está instalado nesta máquina).
+- `--no-verify-jwt` porque é um job administrativo/cron, não uma rota chamada pelo app — invocação manual/teste:
+  ```bash
+  curl -X POST "https://qefkolxhktkzryzcvnfq.supabase.co/functions/v1/sync-anp" -H "Content-Type: application/json" -d '{"uf":"SP"}'
+  ```
+
+**Primeira rodada (SP), 2026-08-06:** 8.411 registros lidos, 6.964 gravados (539 cidades), 1.447 pulados por falta de coordenada. Validado com dados reais no banco (endereço, distribuidora, ponto geográfico batendo com o estado de SP).
+
+## 9. ETL — Edge Function `sync-ocm`
+
+Criada em 2026-08-07. Consome a **Open Charge Map API** (`https://api.openchargemap.io/v3/poi/`), que exige API key gratuita (conta dedicada do AbastecAI em openchargemap.org, key em `.env.local` → `OPENCHARGEMAP_API_KEY`).
+
+- Filtra por `countrycode` (default `BR`), busca até `maxresults` (default 5.000 — a API não pagina por offset nesse endpoint, só limita o total).
+- Antes de gravar os pontos, faz upsert dos operadores (`OperatorInfo.Title`) em `redes_recarga` por `nome`, pra resolver o `rede_id` de cada ponto.
+- Upsert em `pontos_recarga` por `ocm_id` (constraint única adicionada na migration `20260807090000_recarga_unique_constraints.sql`, junto com unique em `redes_recarga.nome` — nenhuma das duas existia na migration original).
+- `tipo_conector` guarda os títulos de `ConnectionType.Title` de cada conexão do POI; `potencia_kw` é o maior `PowerKW` entre as conexões do ponto.
+- `status` é derivado de `StatusType.IsOperational` (`disponivel` / `offline` / `desconhecido`) — a API não expõe ocupação em tempo real, só se o ponto está operacional.
+- Mesmo secret `PROJECT_SECRET_KEY` da `sync-anp`; secret adicional `OPENCHARGEMAP_API_KEY`.
+- Deploy e invocação seguem o mesmo padrão da `sync-anp` (`--use-api`, `--no-verify-jwt`).
+
+**Primeira rodada (BR), 2026-08-07:** 1.607 registros lidos e gravados (0 pulados), 39 operadores, cobrindo o Brasil inteiro — não bateu no `maxresults`, então é provável que seja a cobertura completa da OCM no país hoje.
 
 ## 7. Ambiente de build nativo Android (local, 2026-08-06)
 
@@ -122,3 +160,29 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
    ```
 
 Isso foi validado de ponta a ponta em 2026-08-06 — usuário confirmou a tela do AbastecAI (dark mode, indicadores ✓ Supabase/✓ Mapbox) rodando no emulador `medium_phone`.
+
+### Pegadinhas adicionais descobertas em 2026-08-07 (validação do mapa com dados reais)
+
+1. **`npx expo run:android` trava com um prompt interativo se a porta 8081 já estiver ocupada.** Não é o "Skipping dev server" (esse é inofensivo) — é um segundo prompt, bem mais tarde no build (`Input is required... Use port 8082 instead?`), que nunca recebe resposta porque o processo roda sem TTY. Sintoma: build para de progredir silenciosamente por tempo indefinido, sem erro. Fix: `netstat -ano | grep ":8081.*LISTENING"` antes de rodar, matar qualquer processo velho na porta (`Stop-Process -Id <pid> -Force`).
+
+2. **Avast bloqueia HTTPS no emulador, não só no JDK.** Já era sabido que o Avast quebra download via Java (seção acima, certificado importado no keystore do JDK). Descobri que o mesmo problema existe no **emulador Android**: toda chamada de rede (Mapbox `config_service`, fetch do Supabase) falha com `ERR_CERT_AUTHORITY_INVALID` / `SSLHandshakeException: Trust anchor for certification path not found`. O fix usado foi desativar temporariamente o Avast Shields ("Avast shields control" → "Disable for 10 minutes") direto na bandeja do sistema. Se for preciso rodar isso com frequência, vale investigar importar o certificado do Avast no trust store do sistema do emulador (precisa `-writable-system` + remount), mas desativar temporariamente resolve pro dia a dia.
+
+3. **GPU padrão do emulador (`gfxstream`/auto) quebra a renderização do Mapbox GL.** Com o Avast desativado, a chamada de rede funcionava mas o mapa continuava aparecendo como um retângulo escuro liso, sem tiles nem pins — sem nenhum erro no lado JS. O logcat mostrava `emuglGLESv2_enc: ... GL error 0x501 condition [!isShaderOrProgramObject]`, indicando problema na tradução OpenGL do emulador (comum em GPUs mais antigas/menos compatíveis, como a GeForce MX110 desta máquina). Fix: reiniciar o emulador forçando renderização por software:
+   ```bash
+   emulator -avd medium_phone -gpu swiftshader_indirect
+   ```
+   Isso resolve o problema visual, mas deixa o emulador **bem mais pesado e lento** (a GPU vira 100% CPU-bound) — o processo `qemu-system-x86_64` passou a consumir ~4GB de RAM e CPU muito alta. Em modo software, até `adb exec-out screencap` demora dezenas de segundos. Vale a pena só quando precisa mesmo confirmar visualmente; para desenvolvimento do dia a dia, testar num device físico é bem mais rápido.
+
+**Resultado final, 2026-08-07:** com esses três fixes aplicados, o mapa carregou tiles reais de São Paulo com pins reais do banco (postos cinza — sem nota ANP ainda — e pontos de recarga em ciano), confirmando o pipeline completo Edge Functions → Supabase → RPC geoespacial → app funcionando de ponta a ponta.
+
+## 10. Cron diário das sincronizações
+
+Criado em 2026-08-07 (migration `20260807110000_cron_sync_jobs.sql`). Usa **pg_cron + pg_net**, extensões nativas do Postgres/Supabase — sem depender de nada externo (GitHub Actions, etc.), como o PRD já previa ("Edge Functions agendadas").
+
+**Atualizado em 2026-08-07 (migration `20260807120000_cron_secret_e_cobertura_nacional.sql`):**
+
+- **Cobertura nacional:** `sync-anp` agora roda uma vez por UF (27 jobs, `sync-anp-ac` … `sync-anp-to`), escalonados de 2 em 2 minutos entre 06:00 e 06:52 UTC (03:00–03:52 em Brasília) pra não competir por rede/CPU. `sync-ocm-diario` roda às 07:00 UTC (Open Charge Map já devolve o Brasil inteiro numa chamada só, não precisa de loop por UF).
+- **Autenticação:** as duas Edge Functions continuam com `--no-verify-jwt` (são chamadas pelo cron, não por usuário logado), mas agora exigem o header `x-cron-secret` batendo com `CRON_SYNC_SECRET` (secret da função) — sem ele, `401`. O valor vive em `.env.local` (`CRON_SYNC_SECRET`) e também no **Supabase Vault** (`vault.create_secret`, nome `cron_sync_secret`) — é de lá que o `net.http_post` do cron lê o header, então o valor real nunca aparece em texto puro no arquivo de migration nem no histórico do git.
+- Cada execução (de cada UF, e da recarga) grava sua própria linha em `sync_logs` — mesmo mecanismo de auditoria descrito na seção 8.
+- Consultar/gerenciar os jobs: `select * from cron.job;` e `select * from cron.job_run_details order by start_time desc limit 20;` — a segunda tabela mostra se cada rodada teve sucesso.
+- Pra trocar o secret no futuro: `select vault.update_secret((select id from vault.secrets where name = 'cron_sync_secret'), '<novo-valor>');` **e** `supabase secrets set CRON_SYNC_SECRET=<novo-valor> --project-ref qefkolxhktkzryzcvnfq` (os dois lados precisam ficar em sincronia).
