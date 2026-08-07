@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { termoParaIlike } from "./textoBusca";
 
 export interface PontoRecargaProximo {
   id: string;
@@ -38,6 +39,36 @@ export async function buscarPontosRecargaProximos(
   });
   if (error) throw error;
   return data ?? [];
+}
+
+export interface PontoRecargaResultadoBusca {
+  id: string;
+  nome: string;
+  cidade: string | null;
+  uf: string | null;
+}
+
+// Busca por nome ou cidade — mesmo critério de buscarPostosPorTexto, seção 5.5 do PRD.
+export async function buscarPontosRecargaPorTexto(
+  termo: string,
+  limite = 20
+): Promise<PontoRecargaResultadoBusca[]> {
+  const termoSeguro = termoParaIlike(termo);
+  if (!termoSeguro) return [];
+
+  const { data, error } = await supabase
+    .from("pontos_recarga")
+    .select("id, nome, cidade, uf")
+    .or(`nome.ilike.%${termoSeguro}%,cidade.ilike.%${termoSeguro}%`)
+    .limit(limite);
+  if (error) throw error;
+
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nome: p.nome ?? "Ponto de recarga sem nome",
+    cidade: p.cidade,
+    uf: p.uf,
+  }));
 }
 
 export async function buscarPontoRecargaPorId(id: string): Promise<PontoRecargaDetalhe | null> {

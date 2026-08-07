@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { termoParaIlike } from "./textoBusca";
 
 export interface PostoProximo {
   id: string;
@@ -40,6 +41,38 @@ export async function buscarPostosProximos(
   });
   if (error) throw error;
   return data ?? [];
+}
+
+export interface PostoResultadoBusca {
+  id: string;
+  nome: string;
+  cidade: string | null;
+  uf: string | null;
+  nota_anp: number | null;
+}
+
+// Busca por nome (fantasia ou razão social) ou cidade — seção 5.5 do PRD ("Buscar por cidade").
+export async function buscarPostosPorTexto(termo: string, limite = 20): Promise<PostoResultadoBusca[]> {
+  const termoSeguro = termoParaIlike(termo);
+  if (!termoSeguro) return [];
+
+  const { data, error } = await supabase
+    .from("postos")
+    .select("id, nome_fantasia, razao_social, cidade, uf, nota_anp")
+    .or(
+      `nome_fantasia.ilike.%${termoSeguro}%,razao_social.ilike.%${termoSeguro}%,cidade.ilike.%${termoSeguro}%`
+    )
+    .order("nota_anp", { ascending: false, nullsFirst: false })
+    .limit(limite);
+  if (error) throw error;
+
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    nome: p.nome_fantasia ?? p.razao_social,
+    cidade: p.cidade,
+    uf: p.uf,
+    nota_anp: p.nota_anp,
+  }));
 }
 
 export async function buscarPostoPorId(id: string): Promise<PostoDetalhe | null> {
