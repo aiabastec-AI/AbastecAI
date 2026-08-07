@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Mapbox } from "../src/lib/mapbox";
@@ -7,14 +7,38 @@ import { colors, corDaNota, corDoModo, type ModoMapa } from "../src/theme";
 import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
 import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
+import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
 
 // Centro inicial: São Paulo, onde a primeira sincronização da ANP rodou (ver ARQUITETURA.md).
 const CENTRO_INICIAL: [number, number] = [-46.6333, -23.5505];
 const RAIO_BUSCA_M = 15000;
 
+// Degraus de raio conforme a quantidade de pontos no cluster (PRD 5.2: "Cluster de pins
+// quando zoom out") — cluster pequeno fica discreto, cluster grande chama mais atenção.
+const RAIO_CLUSTER = ["step", ["get", "point_count"], 14, 10, 18, 50, 24] as const;
+
+type PropsFeaturePonto = { id: string; cor: string };
+type PropsFeatureCluster = { cluster: true; point_count: number };
+
+function paraFeatureCollection<T extends { id: string; latitude: number; longitude: number }>(
+  itens: T[],
+  corDoItem: (item: T) => string
+): GeoJSON.FeatureCollection<GeoJSON.Point, PropsFeaturePonto> {
+  return {
+    type: "FeatureCollection",
+    features: itens.map((item) => ({
+      type: "Feature",
+      properties: { id: item.id, cor: corDoItem(item) },
+      geometry: { type: "Point", coordinates: [item.longitude, item.latitude] },
+    })),
+  };
+}
+
 export default function MapaScreen() {
   const router = useRouter();
   const cameraRef = useRef<Mapbox.Camera>(null);
+  const postosSourceRef = useRef<Mapbox.ShapeSource>(null);
+  const recargaSourceRef = useRef<Mapbox.ShapeSource>(null);
   const [modo, setModo] = useState<ModoMapa>("ambos");
   const [postos, setPostos] = useState<PostoProximo[]>([]);
   const [pontosRecarga, setPontosRecarga] = useState<PontoRecargaProximo[]>([]);
@@ -24,6 +48,13 @@ export default function MapaScreen() {
   // Guarda o último centro consultado pra poder recarregar quando o filtro muda,
   // sem precisar mover o mapa nem pegar a localização de novo.
   const centroAtualRef = useRef({ lat: CENTRO_INICIAL[1], lng: CENTRO_INICIAL[0] });
+
+  // Onboarding (PRD 5.1): pede localização no início, com fallback de digitar cidade.
+  const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
+  const [permissaoNegada, setPermissaoNegada] = useState(false);
+  const [cidadeDigitada, setCidadeDigitada] = useState("");
+  const [buscandoCidade, setBuscandoCidade] = useState(false);
+  const [erroCidade, setErroCidade] = useState<string | null>(null);
 
   const carregarDados = useCallback(
     async (lat: number, lng: number) => {
@@ -55,16 +86,71 @@ export default function MapaScreen() {
     carregarDados(centroAtualRef.current.lat, centroAtualRef.current.lng);
   }, [carregarDados]);
 
+  function irParaCoordenada(lat: number, lng: number, zoomLevel: number) {
+    cameraRef.current?.setCamera({
+      centerCoordinate: [lng, lat],
+      zoomLevel,
+      animationDuration: 600,
+    });
+    carregarDados(lat, lng);
+  }
+
+  // Só lê o status atual (sem abrir o diálogo do sistema) pra decidir se mostra o
+  // onboarding ou já centraliza direto na localização de uma permissão anterior.
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === Location.PermissionStatus.GRANTED) {
+        try {
+          const posicao = await Location.getCurrentPositionAsync({});
+          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+        } catch {
+          // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
+        }
+      } else {
+        setMostrarOnboarding(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function irParaMinhaLocalizacao() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;
     const posicao = await Location.getCurrentPositionAsync({});
-    cameraRef.current?.setCamera({
-      centerCoordinate: [posicao.coords.longitude, posicao.coords.latitude],
-      zoomLevel: 14,
-      animationDuration: 600,
-    });
-    carregarDados(posicao.coords.latitude, posicao.coords.longitude);
+    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+  }
+
+  async function aoPermitirLocalizacaoOnboarding() {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      setPermissaoNegada(true);
+      return;
+    }
+    setMostrarOnboarding(false);
+    const posicao = await Location.getCurrentPositionAsync({});
+    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+  }
+
+  async function aoBuscarCidadeOnboarding() {
+    const termo = cidadeDigitada.trim();
+    if (!termo) return;
+    setBuscandoCidade(true);
+    setErroCidade(null);
+    try {
+      const resultado = await buscarCoordenadasPorCidade(termo);
+      if (!resultado) {
+        setErroCidade(`Não encontrei "${termo}".`);
+        return;
+      }
+      setMostrarOnboarding(false);
+      irParaCoordenada(resultado.lat, resultado.lng, 12);
+    } catch (e) {
+      const mensagem = (e as { message?: string })?.message || "Falha ao buscar cidade.";
+      setErroCidade(mensagem);
+    } finally {
+      setBuscandoCidade(false);
+    }
   }
 
   // v10 do @rnmapbox/maps: onMapIdle dispara quando a câmera para de se mover,
@@ -74,8 +160,42 @@ export default function MapaScreen() {
     carregarDados(lat, lng);
   }
 
+  async function aoPressionarFonte(
+    sourceRef: RefObject<Mapbox.ShapeSource | null>,
+    caminhoDetalhe: (id: string) => string,
+    evento: { features: GeoJSON.Feature[] }
+  ) {
+    const feature = evento.features[0];
+    if (!feature) return;
+    const props = feature.properties as (PropsFeaturePonto & Partial<PropsFeatureCluster>) | null;
+
+    if (props?.cluster) {
+      const zoomExpandido = await sourceRef.current?.getClusterExpansionZoom(feature);
+      const coordenadas = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
+      if (zoomExpandido != null) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: coordenadas,
+          zoomLevel: zoomExpandido,
+          animationDuration: 400,
+        });
+      }
+      return;
+    }
+
+    if (props?.id) router.push(caminhoDetalhe(props.id));
+  }
+
   const mostrarCombustivel = modo === "combustivel" || modo === "ambos";
   const mostrarEletrico = modo === "eletrico" || modo === "ambos";
+
+  const postosGeoJSON = useMemo(
+    () => paraFeatureCollection(postos, (p) => corDaNota(p.nota_anp)),
+    [postos]
+  );
+  const recargaGeoJSON = useMemo(
+    () => paraFeatureCollection(pontosRecarga, () => colors.eletrico),
+    [pontosRecarga]
+  );
 
   return (
     <View style={styles.container}>
@@ -89,29 +209,111 @@ export default function MapaScreen() {
           defaultSettings={{ centerCoordinate: CENTRO_INICIAL, zoomLevel: 12 }}
         />
 
-        {mostrarCombustivel &&
-          postos.map((posto) => (
-            <Mapbox.PointAnnotation
-              key={posto.id}
-              id={`posto-${posto.id}`}
-              coordinate={[posto.longitude, posto.latitude]}
-              onSelected={() => router.push(`/posto/${posto.id}`)}
-            >
-              <View style={[styles.pin, { backgroundColor: corDaNota(posto.nota_anp) }]} />
-            </Mapbox.PointAnnotation>
-          ))}
+        {mostrarCombustivel && (
+          <Mapbox.ShapeSource
+            id="postos-fonte"
+            ref={postosSourceRef}
+            shape={postosGeoJSON}
+            cluster
+            clusterRadius={50}
+            clusterMaxZoomLevel={14}
+            onPress={(evento) =>
+              aoPressionarFonte(postosSourceRef, (id) => `/posto/${id}`, evento)
+            }
+          >
+            <Mapbox.CircleLayer
+              id="postos-clusters"
+              filter={["has", "point_count"]}
+              style={{
+                circleRadius: RAIO_CLUSTER,
+                circleColor: colors.combustivel,
+                circleOpacity: 0.9,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.textPrimary,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="postos-clusters-contagem"
+              filter={["has", "point_count"]}
+              style={{
+                textField: ["get", "point_count_abbreviated"],
+                textSize: 12,
+                textColor: colors.background,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+            <Mapbox.CircleLayer
+              id="postos-individuais"
+              filter={["!", ["has", "point_count"]]}
+              style={{
+                circleRadius: 9,
+                circleColor: ["get", "cor"],
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.textPrimary,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        )}
 
-        {mostrarEletrico &&
-          pontosRecarga.map((ponto) => (
-            <Mapbox.PointAnnotation
-              key={ponto.id}
-              id={`recarga-${ponto.id}`}
-              coordinate={[ponto.longitude, ponto.latitude]}
-              onSelected={() => router.push(`/recarga/${ponto.id}`)}
-            >
-              <View style={[styles.pin, { backgroundColor: colors.eletrico }]} />
-            </Mapbox.PointAnnotation>
-          ))}
+        {mostrarEletrico && (
+          <Mapbox.ShapeSource
+            id="recarga-fonte"
+            ref={recargaSourceRef}
+            shape={recargaGeoJSON}
+            cluster
+            clusterRadius={50}
+            clusterMaxZoomLevel={14}
+            onPress={(evento) =>
+              aoPressionarFonte(recargaSourceRef, (id) => `/recarga/${id}`, evento)
+            }
+          >
+            <Mapbox.CircleLayer
+              id="recarga-clusters"
+              filter={["has", "point_count"]}
+              style={{
+                circleRadius: RAIO_CLUSTER,
+                circleColor: colors.eletrico,
+                circleOpacity: 0.9,
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.textPrimary,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="recarga-clusters-contagem"
+              filter={["has", "point_count"]}
+              style={{
+                textField: ["get", "point_count_abbreviated"],
+                textSize: 12,
+                textColor: colors.background,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+            <Mapbox.CircleLayer
+              id="recarga-individuais"
+              filter={["!", ["has", "point_count"]]}
+              style={{
+                circleRadius: 9,
+                circleColor: ["get", "cor"],
+                circleStrokeWidth: 2,
+                circleStrokeColor: colors.textPrimary,
+              }}
+            />
+            {/* Ícone de raio sobre o pin individual — "pin distinto" do elétrico (PRD 5.2) */}
+            <Mapbox.SymbolLayer
+              id="recarga-individuais-icone"
+              filter={["!", ["has", "point_count"]]}
+              style={{
+                textField: "⚡",
+                textSize: 11,
+                textColor: colors.background,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        )}
       </Mapbox.MapView>
 
       <View style={styles.topbar}>
@@ -149,6 +351,48 @@ export default function MapaScreen() {
       >
         <Text style={styles.fabTexto}>📍</Text>
       </Pressable>
+
+      {mostrarOnboarding && (
+        <View style={styles.onboardingOverlay}>
+          <View style={styles.onboardingCard}>
+            <Text style={styles.onboardingTitulo}>Onde você está?</Text>
+            <Text style={styles.onboardingTexto}>
+              Usamos sua localização pra mostrar postos e pontos de recarga por perto.
+            </Text>
+
+            <Pressable style={styles.botaoPrimario} onPress={aoPermitirLocalizacaoOnboarding}>
+              <Text style={styles.botaoPrimarioTexto}>Permitir localização</Text>
+            </Pressable>
+            {permissaoNegada && (
+              <Text style={styles.onboardingAviso}>Permissão negada — digite sua cidade abaixo.</Text>
+            )}
+
+            <View style={styles.onboardingDivisor}>
+              <View style={styles.onboardingLinha} />
+              <Text style={styles.onboardingOu}>ou</Text>
+              <View style={styles.onboardingLinha} />
+            </View>
+
+            <TextInput
+              style={styles.onboardingInput}
+              placeholder="Digite sua cidade"
+              placeholderTextColor={colors.textSecondary}
+              value={cidadeDigitada}
+              onChangeText={setCidadeDigitada}
+              onSubmitEditing={aoBuscarCidadeOnboarding}
+              returnKeyType="search"
+            />
+            {buscandoCidade && <ActivityIndicator color={colors.textPrimary} />}
+            {erroCidade && !buscandoCidade && (
+              <Text style={styles.onboardingAviso}>{erroCidade}</Text>
+            )}
+
+            <Pressable style={styles.botaoSecundario} onPress={() => setMostrarOnboarding(false)}>
+              <Text style={styles.botaoSecundarioTexto}>Agora não</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -177,13 +421,6 @@ function ToggleItem({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   map: { flex: 1 },
-  pin: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: colors.textPrimary,
-  },
   topbar: {
     position: "absolute",
     top: 56,
@@ -240,4 +477,51 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fabTexto: { fontSize: 22 },
+  onboardingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(13, 15, 18, 0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  onboardingCard: {
+    width: "100%",
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 24,
+    gap: 12,
+  },
+  onboardingTitulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+  onboardingTexto: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  onboardingAviso: { color: colors.notaBaixa, fontSize: 12 },
+  onboardingDivisor: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 2 },
+  onboardingLinha: { flex: 1, height: 1, backgroundColor: colors.border },
+  onboardingOu: { color: colors.textSecondary, fontSize: 12 },
+  onboardingInput: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  botaoPrimario: {
+    backgroundColor: colors.textPrimary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+  botaoSecundario: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 14 },
 });
