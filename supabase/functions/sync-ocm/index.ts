@@ -28,6 +28,63 @@ interface PoiOcm {
   StatusType?: { IsOperational: boolean | null } | null;
 }
 
+// A Open Charge Map devolve `StateOrProvince` sem padrão nenhum: sigla, nome completo
+// (com/sem acento, qualquer capitalização), nome em inglês, nome de região metropolitana,
+// "cidade - UF"/"cidade/UF", e até nome de cidade sozinho sem nenhuma pista de estado.
+// Levantamento real feito em 2026-08-08 (`select distinct uf, count(*) from pontos_recarga`)
+// guiou a lista de pistas abaixo — cobre 100% dos valores sujos encontrados até então.
+const UFS_VALIDAS = new Set([
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]);
+
+// Ordenado por tamanho decrescente (feito no map abaixo) pra "mato grosso do sul" ser
+// checado antes de "mato grosso", "paraiba"/"parana" antes de "para", etc. — senão a
+// pista mais curta casaria primeiro e devolveria o estado errado.
+const PISTAS_UF: Array<[string, string]> = [
+  ["acre", "AC"], ["alagoas", "AL"], ["amapa", "AP"], ["amazonas", "AM"],
+  ["bahia", "BA"], ["ceara", "CE"], ["distrito federal", "DF"],
+  ["federal district", "DF"], ["espirito santo", "ES"], ["goias", "GO"],
+  ["maranhao", "MA"], ["mato grosso do sul", "MS"], ["mato grosso", "MT"],
+  ["minas gerais", "MG"], ["para", "PA"], ["paraiba", "PB"], ["parana", "PR"],
+  ["pernambuco", "PE"], ["piaui", "PI"], ["rio grande do norte", "RN"],
+  ["rio grande do sul", "RS"], ["rio grande del sur", "RS"], ["rondonia", "RO"],
+  ["roraima", "RR"], ["santa catarina", "SC"], ["sao paulo", "SP"],
+  ["sergipe", "SE"], ["tocantins", "TO"],
+  // pistas específicas pra grafias quebradas/regiões/cidades sem sigla junto
+  ["de janeiro", "RJ"], ["campina grande", "PB"], ["guarabira", "PB"],
+  ["porto alegre", "RS"], ["brasileia", "AC"], ["camocim", "CE"],
+].sort((a, b) => b[0].length - a[0].length);
+
+function removerAcentos(texto: string): string {
+  return texto.normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "");
+}
+
+function normalizarUf(valorBruto: string | null | undefined): string | null {
+  if (!valorBruto) return null;
+  const valor = valorBruto.trim();
+  if (!valor) return null;
+
+  // "Barreiras - BA", "Indaiatuba - SP", "CORRENTE/PI": a sigla já vem no final.
+  const combinado = valor.match(/[-/]\s*([A-Za-z]{2})\s*$/);
+  if (combinado && UFS_VALIDAS.has(combinado[1].toUpperCase())) {
+    return combinado[1].toUpperCase();
+  }
+
+  if (/^[A-Za-z]{2}$/.test(valor) && UFS_VALIDAS.has(valor.toUpperCase())) {
+    return valor.toUpperCase();
+  }
+
+  const chave = removerAcentos(valor).toLowerCase();
+  for (const [pista, sigla] of PISTAS_UF) {
+    if (chave.includes(pista)) return sigla;
+  }
+
+  // Não reconhecido (ex.: nome de cidade sem nenhuma pista de estado) — mantém o valor
+  // original em vez de arriscar um mapeamento errado ou apagar o dado.
+  return valor;
+}
+
 function normalizarStatus(poi: PoiOcm): string {
   const operacional = poi.StatusType?.IsOperational;
   if (operacional === true) return "disponivel";
@@ -56,7 +113,7 @@ function montarLinhaPonto(poi: PoiOcm, redeId: string | null) {
     nome: endereco.AddressLine1 || poi.OperatorInfo?.Title || "Ponto de recarga",
     endereco: endereco.AddressLine1 || null,
     cidade: endereco.Town || null,
-    uf: endereco.StateOrProvince || null,
+    uf: normalizarUf(endereco.StateOrProvince),
     localizacao: `SRID=4326;POINT(${endereco.Longitude} ${endereco.Latitude})`,
     tipo_conector: conectores.length > 0 ? conectores : null,
     potencia_kw: potenciaMaxima,
