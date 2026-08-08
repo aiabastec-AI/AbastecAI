@@ -44,6 +44,15 @@ module.exports = {
             "O AbastecAI usa sua localização pra mostrar postos e pontos de recarga próximos.",
         },
       ],
+      // Ícone/cor da notificação no Android; token em si só sai depois de "eas init"
+      // vincular o projeto a uma conta Expo (ver ARQUITETURA.md, seção de push).
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#0D0F12",
+        },
+      ],
     ],
     extra: {
       // Só valores seguros pro cliente: publishable key (não a secret) e o

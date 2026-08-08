@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 
 const { supabaseUrl, supabasePublishableKey } = Constants.expoConfig?.extra ?? {};
@@ -9,11 +10,13 @@ if (!supabaseUrl || !supabasePublishableKey) {
   );
 }
 
-// MVP não tem login (ver PRD), então sessão não precisa persistir ainda.
-// Quando a fase 2 (login opcional) chegar, trocar por um storage adapter
-// (ex.: @react-native-async-storage/async-storage) e habilitar persistSession.
+// Fase 2 (login opcional): sessão persiste no AsyncStorage pra não pedir
+// login de novo a cada abertura do app.
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
-    persistSession: false,
+    storage: AsyncStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
   },
 });

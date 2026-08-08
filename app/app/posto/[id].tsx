@@ -3,11 +3,15 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, Vi
 import { useLocalSearchParams } from "expo-router";
 import { colors, corDaNota } from "../../src/theme";
 import { buscarFiscalizacoesDoPosto, buscarPostoPorId, type Fiscalizacao, type PostoDetalhe } from "../../src/lib/postos";
+import { BotaoFavorito } from "../../src/components/BotaoFavorito";
+import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
+import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 export default function FichaPosto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [fiscalizacoes, setFiscalizacoes] = useState<Fiscalizacao[]>([]);
+  const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,6 +24,9 @@ export default function FichaPosto() {
       .catch(() => {
         // não bloqueia a ficha se só o histórico de fiscalização falhar
       });
+    buscarIdsPatrocinados([id], [])
+      .then((ids) => setPatrocinado(ids.has(id)))
+      .catch(() => {});
   }, [id]);
 
   if (erro) {
@@ -63,6 +70,13 @@ export default function FichaPosto() {
         </View>
       </View>
       {posto.bandeira && <Text style={styles.bandeira}>{posto.bandeira}</Text>}
+      {patrocinado && (
+        <View style={styles.patrocinadoBadge}>
+          <Text style={styles.patrocinadoTexto}>★ Patrocinado</Text>
+        </View>
+      )}
+
+      <BotaoFavorito alvo={{ tipo: "posto", id: posto.id }} />
 
       <View style={styles.card}>
         {endereco && <Linha label="Endereço" valor={endereco} />}
@@ -102,6 +116,8 @@ export default function FichaPosto() {
       >
         <Text style={styles.botaoSecundarioTexto}>Denunciar à ANP</Text>
       </Pressable>
+
+      <SecaoAvaliacoes alvo={{ tipo: "posto", id: posto.id }} />
     </ScrollView>
   );
 }
@@ -124,6 +140,14 @@ const styles = StyleSheet.create({
   notaBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   notaTexto: { color: colors.background, fontWeight: "700", fontSize: 16 },
   bandeira: { color: colors.textSecondary, fontSize: 14 },
+  patrocinadoBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.notaMedia,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  patrocinadoTexto: { color: colors.background, fontWeight: "700", fontSize: 11 },
   card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 10 },
   tituloCard: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
   linha: { gap: 2 },

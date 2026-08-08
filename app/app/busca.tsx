@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { colors, corDaNota } from "../src/theme";
 import { buscarPostosPorTexto, type PostoResultadoBusca } from "../src/lib/postos";
 import { buscarPontosRecargaPorTexto, type PontoRecargaResultadoBusca } from "../src/lib/recarga";
+import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 
 const TERMO_MINIMO = 2;
 const DEBOUNCE_MS = 350;
@@ -16,6 +17,7 @@ export default function Busca() {
   const router = useRouter();
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<ItemResultado[]>([]);
+  const [patrocinados, setPatrocinados] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -43,6 +45,12 @@ export default function Busca() {
           ...postos.map((dado): ItemResultado => ({ tipo: "posto", dado })),
           ...pontosRecarga.map((dado): ItemResultado => ({ tipo: "recarga", dado })),
         ]);
+        buscarIdsPatrocinados(
+          postos.map((p) => p.id),
+          pontosRecarga.map((p) => p.id)
+        )
+          .then((ids) => !cancelado && setPatrocinados(ids))
+          .catch(() => {});
       } catch (e) {
         if (cancelado) return;
         // erros do supabase-js (PostgrestError) não são instanceof Error, só têm .message
@@ -115,6 +123,7 @@ export default function Busca() {
             />
             <View style={styles.itemTextos}>
               <Text style={styles.itemNome} numberOfLines={1}>
+                {patrocinados.has(item.dado.id) ? "★ " : ""}
                 {item.dado.nome}
               </Text>
               <Text style={styles.itemLocal} numberOfLines={1}>

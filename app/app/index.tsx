@@ -8,6 +8,7 @@ import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
 import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
+import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 
 // Centro inicial: São Paulo, onde a primeira sincronização da ANP rodou (ver ARQUITETURA.md).
 const CENTRO_INICIAL: [number, number] = [-46.6333, -23.5505];
@@ -17,22 +18,28 @@ const RAIO_BUSCA_M = 15000;
 // quando zoom out") — cluster pequeno fica discreto, cluster grande chama mais atenção.
 const RAIO_CLUSTER = ["step", ["get", "point_count"], 14, 10, 18, 50, 24] as const;
 
-type PropsFeaturePonto = { id: string; cor: string };
+type PropsFeaturePonto = { id: string; cor: string; patrocinado: boolean };
 type PropsFeatureCluster = { cluster: true; point_count: number };
 
 function paraFeatureCollection<T extends { id: string; latitude: number; longitude: number }>(
   itens: T[],
-  corDoItem: (item: T) => string
+  propsDoItem: (item: T) => { cor: string; patrocinado: boolean }
 ): GeoJSON.FeatureCollection<GeoJSON.Point, PropsFeaturePonto> {
   return {
     type: "FeatureCollection",
     features: itens.map((item) => ({
       type: "Feature",
-      properties: { id: item.id, cor: corDoItem(item) },
+      properties: { id: item.id, ...propsDoItem(item) },
       geometry: { type: "Point", coordinates: [item.longitude, item.latitude] },
     })),
   };
 }
+
+// Anel dourado + espessura maior em volta do pin patrocinado (PRD fase 2:
+// "visualização e regras de exibição no mapa/lista").
+const COR_PATROCINADO = "#F5A623";
+const STROKE_COR_PIN = ["case", ["==", ["get", "patrocinado"], true], COR_PATROCINADO, "#FFFFFF"] as const;
+const STROKE_LARGURA_PIN = ["case", ["==", ["get", "patrocinado"], true], 3, 2] as const;
 
 export default function MapaScreen() {
   const router = useRouter();
@@ -42,6 +49,7 @@ export default function MapaScreen() {
   const [modo, setModo] = useState<ModoMapa>("ambos");
   const [postos, setPostos] = useState<PostoProximo[]>([]);
   const [pontosRecarga, setPontosRecarga] = useState<PontoRecargaProximo[]>([]);
+  const [patrocinados, setPatrocinados] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const { notaMinima, conectoresAtivos } = useFiltros();
@@ -68,6 +76,13 @@ export default function MapaScreen() {
         ]);
         setPostos(postosResultado);
         setPontosRecarga(recargaResultado);
+        // Não bloqueia a tela se isso falhar — patrocínio é um extra visual, não dado essencial.
+        buscarIdsPatrocinados(
+          postosResultado.map((p) => p.id),
+          recargaResultado.map((p) => p.id)
+        )
+          .then(setPatrocinados)
+          .catch(() => {});
       } catch (e) {
         // erros do supabase-js (PostgrestError) não são instanceof Error, só têm .message
         const mensagem = (e as { message?: string })?.message || "Falha ao carregar dados do mapa.";
@@ -189,12 +204,20 @@ export default function MapaScreen() {
   const mostrarEletrico = modo === "eletrico" || modo === "ambos";
 
   const postosGeoJSON = useMemo(
-    () => paraFeatureCollection(postos, (p) => corDaNota(p.nota_anp)),
-    [postos]
+    () =>
+      paraFeatureCollection(postos, (p) => ({
+        cor: corDaNota(p.nota_anp),
+        patrocinado: patrocinados.has(p.id),
+      })),
+    [postos, patrocinados]
   );
   const recargaGeoJSON = useMemo(
-    () => paraFeatureCollection(pontosRecarga, () => colors.eletrico),
-    [pontosRecarga]
+    () =>
+      paraFeatureCollection(pontosRecarga, (p) => ({
+        cor: colors.eletrico,
+        patrocinado: patrocinados.has(p.id),
+      })),
+    [pontosRecarga, patrocinados]
   );
 
   return (
@@ -249,8 +272,21 @@ export default function MapaScreen() {
               style={{
                 circleRadius: 9,
                 circleColor: ["get", "cor"],
-                circleStrokeWidth: 2,
-                circleStrokeColor: colors.textPrimary,
+                circleStrokeWidth: STROKE_LARGURA_PIN,
+                circleStrokeColor: STROKE_COR_PIN,
+              }}
+            />
+            {/* Estrelinha sobre o pin patrocinado — postos não têm ícone próprio, então dá
+                pra sobrepor sem conflitar (diferente do elétrico, que já usa o "⚡"). */}
+            <Mapbox.SymbolLayer
+              id="postos-patrocinados-icone"
+              filter={["all", ["!", ["has", "point_count"]], ["==", ["get", "patrocinado"], true]]}
+              style={{
+                textField: "★",
+                textSize: 10,
+                textColor: colors.background,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
               }}
             />
           </Mapbox.ShapeSource>
@@ -296,8 +332,8 @@ export default function MapaScreen() {
               style={{
                 circleRadius: 9,
                 circleColor: ["get", "cor"],
-                circleStrokeWidth: 2,
-                circleStrokeColor: colors.textPrimary,
+                circleStrokeWidth: STROKE_LARGURA_PIN,
+                circleStrokeColor: STROKE_COR_PIN,
               }}
             />
             {/* Ícone de raio sobre o pin individual — "pin distinto" do elétrico (PRD 5.2) */}

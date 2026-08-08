@@ -3,10 +3,14 @@ import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, Pressab
 import { useLocalSearchParams } from "expo-router";
 import { colors } from "../../src/theme";
 import { buscarPontoRecargaPorId, type PontoRecargaDetalhe } from "../../src/lib/recarga";
+import { BotaoFavorito } from "../../src/components/BotaoFavorito";
+import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
+import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 export default function FichaRecarga() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [ponto, setPonto] = useState<PontoRecargaDetalhe | null | undefined>(undefined);
+  const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -14,6 +18,9 @@ export default function FichaRecarga() {
     buscarPontoRecargaPorId(id)
       .then(setPonto)
       .catch((e) => setErro(e instanceof Error ? e.message : "Falha ao carregar ponto de recarga."));
+    buscarIdsPatrocinados([], [id])
+      .then((ids) => setPatrocinado(ids.has(id)))
+      .catch(() => {});
   }, [id]);
 
   if (erro) {
@@ -56,6 +63,13 @@ export default function FichaRecarga() {
         )}
       </View>
       {ponto.operador && <Text style={styles.operador}>{ponto.operador}</Text>}
+      {patrocinado && (
+        <View style={styles.patrocinadoBadge}>
+          <Text style={styles.patrocinadoTexto}>★ Patrocinado</Text>
+        </View>
+      )}
+
+      <BotaoFavorito alvo={{ tipo: "recarga", id: ponto.id }} />
 
       <View style={styles.card}>
         {endereco && <Linha label="Endereço" valor={endereco} />}
@@ -70,6 +84,8 @@ export default function FichaRecarga() {
           <Text style={styles.botaoPrimarioTexto}>Traçar rota</Text>
         </Pressable>
       )}
+
+      <SecaoAvaliacoes alvo={{ tipo: "recarga", id: ponto.id }} />
     </ScrollView>
   );
 }
@@ -97,6 +113,14 @@ const styles = StyleSheet.create({
   },
   potenciaTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
   operador: { color: colors.textSecondary, fontSize: 14 },
+  patrocinadoBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.notaMedia,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  patrocinadoTexto: { color: colors.background, fontWeight: "700", fontSize: 11 },
   card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 10 },
   linha: { gap: 2 },
   linhaLabel: { color: colors.textSecondary, fontSize: 12 },
