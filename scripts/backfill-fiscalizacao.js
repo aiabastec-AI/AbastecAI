@@ -19,13 +19,19 @@
 //
 // Passo 2 — rodar (precisa de SUPABASE_URL e SUPABASE_SECRET_KEY no ambiente):
 //   cd scripts && npm install && node backfill-fiscalizacao.js
+//
+// Também roda no GitHub Actions (.github/workflows/backfill-fiscalizacao.yml, mensal) —
+// lá as duas variáveis vêm de secrets do repositório, não do .env.local (que nunca é
+// commitado, então não existe no runner).
 
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
 
 function lerEnvLocal() {
-  const conteudo = fs.readFileSync(path.join(__dirname, "..", ".env.local"), "utf8");
+  const arquivo = path.join(__dirname, "..", ".env.local");
+  if (!fs.existsSync(arquivo)) return {};
+  const conteudo = fs.readFileSync(arquivo, "utf8");
   const env = {};
   for (const linha of conteudo.split("\n")) {
     const m = linha.match(/^([A-Z_]+)=(.*)$/);
@@ -34,9 +40,16 @@ function lerEnvLocal() {
   return env;
 }
 
-const env = lerEnvLocal();
-const SUPABASE_URL = env.SUPABASE_URL;
-const SUPABASE_SECRET_KEY = env.SUPABASE_SECRET_KEY;
+// .env.local (uso local) tem prioridade; no CI ele não existe, então cai pro
+// process.env (secrets injetados pelo workflow do GitHub Actions).
+const envLocal = lerEnvLocal();
+const SUPABASE_URL = envLocal.SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_SECRET_KEY = envLocal.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
+  console.error("Faltam SUPABASE_URL / SUPABASE_SECRET_KEY (nem no .env.local, nem no ambiente).");
+  process.exit(1);
+}
 
 const HEADERS = {
   apikey: SUPABASE_SECRET_KEY,

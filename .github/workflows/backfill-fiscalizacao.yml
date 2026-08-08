@@ -1,0 +1,48 @@
+name: Backfill mensal — Ações de Fiscalização (ANP)
+
+# Roda fora do Supabase de propósito: o arquivo (~15 MB, 233 mil linhas) estoura o
+# limite de recurso de uma Edge Function, e o download só funciona simulando uma
+# sessão de navegador pra passar da proteção anti-bot do gov.br — ver comentário no
+# topo de scripts/backfill-fiscalizacao.js e ARQUITETURA.md.
+
+on:
+  schedule:
+    # Dia 2 de cada mês, 09:00 UTC — um dia depois do cron do sync-pmqc (dia 1º),
+    # pra não competir por recurso. A ANP publica essa planilha com atraso de ~2 meses,
+    # então não tem pressa em rodar exatamente no dia 1.
+    - cron: "0 9 2 * *"
+  workflow_dispatch: {}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Baixar a planilha de fiscalização (simulando sessão de navegador)
+        run: |
+          set -euo pipefail
+          mkdir -p scripts/dados
+          curl -sf -c cookies.txt -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
+            "https://www.gov.br/anp/pt-br/centrais-de-conteudo/paineis-dinamicos-da-anp/painel-dinamico-da-fiscalizacao-do-abastecimento" \
+            -o pagina.html
+          curl -sf -b cookies.txt -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
+            -e "https://www.gov.br/anp/pt-br/centrais-de-conteudo/paineis-dinamicos-da-anp/painel-dinamico-da-fiscalizacao-do-abastecimento" \
+            "https://www.gov.br/anp/pt-br/centrais-de-conteudo/paineis-dinamicos-da-anp/arquivos-dados-brutos-do-painel-dinamico-da-fiscalizacao-do-abastecimento-da-sfi/dados-fisc-a-partir-2019.xlsx" \
+            -o scripts/dados/dados-fisc.xlsx
+          ls -la scripts/dados/dados-fisc.xlsx
+
+      - name: Instalar dependências do script
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Rodar backfill
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: node backfill-fiscalizacao.js
