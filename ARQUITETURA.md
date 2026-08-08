@@ -2,7 +2,7 @@
 
 Este documento existe pra registrar **o que foi decidido, por quê, e o que falta** — tanto pra quem for programar quanto pra qualquer sessão de IA que continue o projeto depois. Baseado nos dois PRDs (`PRD  AbastecAI.md` e `PRD-app-combustivel-eletrico.md`), que convergem no mesmo stack.
 
-Última atualização: 2026-08-06.
+Última atualização: 2026-08-08.
 
 ---
 
@@ -41,7 +41,7 @@ AbastecAI/
 ## 4. Fases do projeto
 
 - **Fase 1 (MVP)**: `app/` (Expo). Mapa, fichas de posto/recarga, sem login. Concluída — ver seção 4-5 do `PRD-app-combustivel-eletrico.md`.
-- **Fase 2 (em andamento, núcleo pronto em 2026-08-08)**: login opcional + favoritos + avaliações no mobile, e `admin/` (Next.js) com patrocínios + moderação — ver seção 11 pro detalhe completo e o que ainda falta (exibição de patrocínio no mapa, notificações push, confirmação de e-mail real).
+- **Fase 2 (núcleo pronto em 2026-08-08)**: login opcional + favoritos + avaliações no mobile, `admin/` (Next.js) com patrocínios + moderação, **nota ANP real** (fórmula oficial replicada + histórico de fiscalização, ver seção 13) e um refresh visual (tema dia/noite automático, localização em tempo real, navegação, ver seção 12) — ver seção 11 pro núcleo original e o que ainda falta (notificações push de verdade, confirmação de e-mail real).
 - **Fase 3**: preço colaborativo, rotas por custo, B2B — sem stack nova, é sobre as mesmas camadas.
 
 ## 5. Credenciais e onde vivem
@@ -272,3 +272,96 @@ PRD fase 2: "Notificações push (favoritos, alertas)". Escopo que decidi cobrir
 - [ ] **Gatilho automático de alerta** (ex.: "sua nota do posto favoritado mudou") — hoje só dá pra mandar notificação manualmente pelo admin, não existe detecção automática de mudança.
 - [ ] **UI de convite/promoção de admin** — hoje só dá pra virar admin sendo o primeiro cadastro ou via SQL manual (`insert into admin_usuarios (auth_id) values (...)`).
 - [ ] Conta de teste do mobile (`teste.fase2@abastecai.dev` / `senha123456`) e do admin (`admin.teste@abastecai.dev` / `senhaadmin123`) ficaram no banco de propósito — servem de login de exemplo. Os dados fake que elas geraram (patrocínio, avaliação, favorito de teste) foram removidos do banco.
+
+## 12. Refresh visual, localização em tempo real e navegação (2026-08-08)
+
+Feito numa sessão de testes reais do app — você trouxe um protótipo paralelo feito no Google AI Studio (`aiabastec-AI/AbastecAI-Google`, repo privado, acesso concedido via colaborador) como inspiração visual, mais uma lista de ajustes de UX depois de usar o app de verdade no emulador.
+
+### 12.1 Tema claro/escuro automático
+
+- `app/src/theme.ts`: `colors` estático virou `darkColors`/`lightColors` (mesmas chaves; só fundo/card/texto/borda mudam — cores de marca e de nota ficam iguais nos dois temas, é identidade visual/semântica, não deveria mudar com o horário).
+- `app/src/lib/ThemeProvider.tsx` (novo): decide `claro` (6h–18h, horário local do device) vs `escuro` na montagem, reavalia quando o app volta do background (`AppState`). Todos os componentes/telas migraram de `import { colors } from "theme"` (estático) pra `useTheme()` (hook) — inclui mover `StyleSheet.create` de escopo de módulo pra dentro do componente via `useMemo(() => criarEstilos(colors), [colors])`, já que os estilos agora dependem de um valor que muda em runtime.
+- `app/app/index.tsx`: `styleURL` do Mapbox também troca entre `light-v11`/`dark-v11` conforme o tema.
+
+### 12.2 Mapa: pins squircle, localização em tempo real, escala corrigida
+
+- **Pins individuais** (postos/pontos de recarga) trocaram de `CircleLayer` pra `SymbolLayer` com um ícone SDF ("squircle", retângulo bem arredondado) — `app/assets/map/pin-squircle.png`, gerado por um script Node descartável (só `zlib`, sem lib nova) — registrado via `<Mapbox.Images>` e tingido por feature via `iconColor: ["get","cor"]`. Clusters continuam `CircleLayer` (formato certo pra contagem agregada).
+- **`<Mapbox.UserLocation>`** (nativo do `@rnmapbox/maps`) adicionado ao `MapView` — pontinho azul com pulso que atualiza sozinho com o GPS, igual Google Maps/Waze/iFood. Não precisa de código de polling nem de permissão extra (usa a mesma permissão que o onboarding já pedia via `expo-location`); se a permissão não foi concedida, simplesmente não desenha nada.
+- **Barra de escala do Mapbox** (`scaleBarEnabled`) vem, por padrão, grudada no canto superior esquerdo — por cima de tudo, inclusive da status bar — e em milhas. Reposicionada via `scaleBarPosition={{ top: 168, left: 16 }}` (embaixo do toggle/Buscar/Filtros) e `scaleBarUnits="metric"`.
+- **Toggle do topo** trocou de texto pra só ícones (`@expo/vector-icons`, `MaterialCommunityIcons` — biblioteca nova instalada nesta sessão via `npx expo install`; não tem módulo nativo próprio, só precisou de rebuild porque `expo-font`, do qual depende, ainda não estava linkado no projeto Android — confirmado que basta rebuild normal, não precisa de `expo prebuild`).
+- **Lista horizontal de cards** embaixo do mapa (`app/src/components/CardResultadoProximo.tsx`) — é o "bottom overlay" que o PRD original já previa (listagem rápida de resultados próximos) e nunca tinha sido implementado. Fundo tintado na cor de marca por tipo (laranja combustível / ciano elétrico), respeita o mesmo filtro Combustível/Elétrico/Ambos do toggle.
+
+### 12.3 Navegação: botão de voltar universal
+
+Nenhuma tela modal (`busca`, `filtros`, `config`, `login`, `favoritos`, ficha de posto/recarga) tinha um jeito visível de voltar — só gesto de arrastar pra baixo ou o botão físico do Android. `app/src/components/BotaoVoltar.tsx` (novo): seta de voltar renderizada no fluxo normal (não floating) como primeiro item de cada tela, `router.back()` com fallback pra `router.replace("/")` se não houver pilha de navegação. Adicionado nas 7 telas modais; o mapa (tela principal) não recebe, não faz sentido "voltar" dali.
+
+### 12.4 Pegadinha de teste (não é bug do app)
+
+A bolha flutuante do menu de desenvolvedor do Expo (círculo azul com engrenagem, "Tools") pode aparecer sobreposta a elementos do nosso app durante teste no emulador/device — **só existe em build de desenvolvimento**, some completamente no app publicado de verdade. Já apareceu sobreposta ao FAB de localização numa sessão de teste; não precisa de nenhum ajuste de código pra isso.
+
+## 13. Nota ANP e histórico de fiscalização (2026-08-08)
+
+Fechou o maior gap identificado contra o PRD (itens Must M1/M4: pin colorido por nota, resumo de fiscalização na ficha) — até aqui `postos.nota_anp` era sempre `null` porque nenhum job alimentava esse dado.
+
+### 13.1 A fórmula oficial
+
+A ANP não publica API nem fórmula pronta, mas você trouxe a página de metodologia do app oficial **"ANP com Vc – Postos"** (validada contra um posto real, `AUTO POSTO VITOHARY LTDA`, CNPJ `65457780000149`):
+
+```
+desconto = 2 × infrações (vício qualidade/quantidade, últimos 2 anos)
+         + 1 × infrações (vício qualidade/quantidade, 2–5 anos)
+         + 1 × amostras PMQC não conformes (últimos 2 anos)
+         + 0,5 × amostras PMQC não conformes (2–5 anos)
+
+nota = 5 − round(desconto)
+nota = 0  se posto inativo/interditado, ou se desconto > 5
+nota = clamp(nota, 0, 5)
+```
+
+**Decisão de produto**: posto sem nenhum registro (fiscalização ou amostra) nos últimos 5 anos fica com `nota_anp = null` ("ainda não fiscalizado") em vez de assumir nota 5 automática — a fórmula pura daria 5 pra ausência de dado, mas isso passaria falsa impressão de "verificado" pra maioria dos ~180 mil postos do Brasil que nunca foram testados. A ficha do posto (`app/app/posto/[id].tsx`) mostra um badge explícito "Ainda não fiscalizado" nesse caso, não só um "—" ambíguo.
+
+Implementada como função SQL `recalcular_nota_anp(p_posto_id uuid)` (migration `20260808110000`) e uma versão em lote `recalcular_notas_lote(p_posto_ids uuid[])` (migration `20260808120000` — o loop roda dentro do Postgres numa chamada só, porque chamar a função individualmente por RPC pra cada posto de um sync nacional estourava o limite de recurso do worker da Edge Function).
+
+### 13.2 Fontes de dados
+
+1. **PMQC** (qualidade do combustível) — JSON público, mensal:
+   `https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/arquivos/pmqc/{ano}/pmqc_{ano}_{mes}.json`
+   - **Pegadinha real**: a ANP não manteve um padrão de nome de arquivo estável — meses recentes usam `pmqc_2026_06.json` (underscore), mas jul–dez/2025 usam `pmqc-2025-12.json` (hífen), e alguns meses de 2024 nem têm o ano no nome. `supabase/functions/sync-pmqc/index.ts` tenta os dois padrões conhecidos antes de desistir; ainda existem lacunas históricas (meses em formato não mapeado) que não valeu a pena perseguir um por um.
+   - `CNPJ` no JSON vem **pontuado** (`63.117.677/0001-24`) — precisa normalizar (só dígitos) pra bater com `postos.cnpj`, que é salvo sem pontuação.
+   - Backfill de ~29 meses reais já rodado (2022–2026, com lacunas nos meses cujo padrão de nome ainda não foi mapeado).
+
+2. **Ações de Fiscalização do Abastecimento** (infrações de qualidade E quantidade — o PMQC só cobre qualidade) — planilha XLSX bruta, **não** uma API:
+   `https://www.gov.br/anp/.../dados-fisc-a-partir-2019.xlsx` (~15,5 MB, 233.266 linhas, coluna `Segmento Fiscalizado = "Revenda de Combustíveis"` é o recorte relevante).
+   - **Download bloqueado pra requisição direta** (403, proteção anti-bot do gov.br) — só funciona simulando uma sessão de navegador real (`curl` com cookie da página + header `Referer`, ver comentário no topo de `scripts/backfill-fiscalizacao.js`).
+   - **Arquivo grande demais pra uma Edge Function** — já confirmado na prática (o `sync-pmqc` estourou o limite de recurso do worker num arquivo bem menor, 4,5 MB, antes do fix do recálculo em lote). Por isso o processamento roda **local** (Node + lib `xlsx`), não como Edge Function.
+   - Colunas: `UF, Município, Bairro, ENDEREÇO, CNPJ/CPF, Agente Econômico, Segmento Fiscalizado, DATA DO DF, Número do Documento, Procedimento de Fiscalização, Resultado`. Uma "fiscalização" (evento, chave = `Número do Documento`/DF) pode ter várias linhas de "Resultado" — cada uma vira uma `infração` só se `Procedimento de Fiscalização = "Auto de Infração"` **e** o texto do `Resultado` bater com uma lista de palavras-chave de vício de qualidade/quantidade (não existe coluna de classificação pronta — é heurística, documentada em `scripts/backfill-fiscalizacao.js`; a ANP não publica o dicionário de classificação).
+
+### 13.3 Modelo de dados
+
+`fiscalizacoes` (redesenhada — estava sempre vazia, sem risco de migrar dado) separa **evento de fiscalização** de **infração encontrada** (uma fiscalização pode não ter infração nenhuma):
+- `fiscalizacoes`: `id, posto_id, numero_df (unique), data_fiscalizacao, tipo_convenio, fiscalizacao_campo`.
+- `infracoes` (nova): `id, fiscalizacao_id → fiscalizacoes, classificacao ('vicio_qualidade'|'vicio_quantidade'), descricao, componente_df`. Unique em `(fiscalizacao_id, descricao)` (migration `20260808130000`) — sem isso, rodar o backfill de novo duplicaria infração.
+- `amostras_pmqc` (nova): `id, posto_id, amostra_id_externo (unique, é a chave numérica do próprio JSON da ANP), data_coleta, produto, conforme, ensaios jsonb`.
+
+### 13.4 Sincronização
+
+- **`sync-pmqc`** (Edge Function, `supabase/functions/sync-pmqc/`): mesmo padrão de `sync-anp`/`sync-ocm` (sync_logs, `PROJECT_SECRET_KEY`, `--use-api --no-verify-jwt`, cron com `x-cron-secret`). Cron mensal, dia 1º, sincroniza o **mês anterior** (migration `20260808140000`).
+- **`scripts/backfill-fiscalizacao.js`**: roda fora do Supabase (ver 13.2). Idempotente (upsert por `numero_df`/`(fiscalizacao_id, descricao)`, seguro rodar de novo). Lê `SUPABASE_URL`/`SUPABASE_SECRET_KEY` do `.env.local` localmente ou de `process.env` no CI.
+- **`.github/workflows/backfill-fiscalizacao.yml`**: automatiza o script acima via GitHub Actions (cron mensal, dia 2, roda fora do Supabase então não tem os mesmos limites de recurso, e consegue rodar o `curl` com sessão de navegador sem problema). Precisa dos secrets `SUPABASE_URL` e `SUPABASE_SECRET_KEY` cadastrados no repositório (Settings → Secrets and variables → Actions) — já configurados.
+
+### 13.5 Resultado do backfill inicial e validação
+
+233.266 linhas da planilha processadas → 124.736 relevantes (últimos 5 anos, segmento certo) → **52.978 fiscalizações** e **4.654 infrações** carregadas, afetando **21.684 postos**. PMQC: ~29 meses reais, milhares de amostras.
+
+**Validado ponta a ponta** contra o caso real que você trouxe da tela do app oficial: `AUTO POSTO VITOHARY LTDA` fechou em nota **5.0**, 2 fiscalizações (DF `703693` e `686619`, mesmas datas), 0 infrações, 3 amostras conformes (mesmas datas/produtos) — bate exatamente.
+
+### 13.6 UI
+
+- `app/app/posto/[id].tsx`: badge de nota maior/destacado (fundo translúcido na cor da faixa); quando `nota_anp` é `null`, mostra "Ainda não fiscalizado" em vez de "—" solto; card "Histórico de fiscalização" com resumo (`X fiscalizações · Y infrações · Z amostras`) e lista real por data/DF.
+- `app/src/lib/postos.ts`: `buscarFiscalizacoesDoPosto` (sempre vazia) virou `buscarHistoricoFiscalizacao` (join `fiscalizacoes`+`infracoes`, mais `amostras_pmqc` separado).
+
+### 13.7 O que ficou pra depois
+
+- [ ] Lacunas históricas do PMQC — meses cujo padrão de nome de arquivo ainda não foi mapeado (ver 13.2) continuam sem sincronizar. Não bloqueia o essencial (a fórmula olha 5 anos, e a maior parte do período recente já está coberta), mas cobertura não é 100%.
+- [ ] Classificação de infração (vício de qualidade/quantidade) é heurística por palavra-chave — pode errar em casos de fraseado que eu não previ. Revisar a lista em `scripts/backfill-fiscalizacao.js` se a nota de algum posto específico parecer errada.
+- [ ] `sync-fiscalizacao` (a planilha XLSX) só atualiza via GitHub Actions mensal — se o layout do gov.br mudar (nova proteção anti-bot, URL diferente), o workflow quebra silenciosamente até alguém notar (não tem alerta configurado).

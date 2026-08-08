@@ -1,10 +1,9 @@
 // Sincroniza dados cadastrais de postos de combustível a partir da API Revendedores da ANP
 // (https://revendedoresapi.anp.gov.br/v1/combustivel) — API pública, sem autenticação.
 //
-// Escopo atual: só dados cadastrais (nome, CNPJ, endereço, localização, distribuidora).
-// A nota_anp (0-5) fica de fora por enquanto: não existe API pública pra ela nem pros dados
-// de fiscalização/PMQC que a alimentam (só CSV pra download, sem metodologia de cálculo
-// publicada) — ver ARQUITETURA.md.
+// Escopo: só dados cadastrais (nome, CNPJ, endereço, localização, distribuidora).
+// A nota_anp (0-5) é calculada à parte, por `recalcular_nota_anp`, a partir dos dados que
+// `sync-pmqc` e `scripts/backfill-fiscalizacao.js` carregam — ver ARQUITETURA.md seção 13.
 //
 // Invocação manual: POST /functions/v1/sync-anp  { "uf": "SP" }  (uf default: SP)
 
