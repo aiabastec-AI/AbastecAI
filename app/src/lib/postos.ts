@@ -87,23 +87,51 @@ export async function buscarPostoPorId(id: string): Promise<PostoDetalhe | null>
   return data;
 }
 
-export interface Fiscalizacao {
-  id: string;
-  tipo: string | null;
-  resultado: string | null;
-  data_fiscalizacao: string | null;
+export interface InfracaoResumo {
+  classificacao: "vicio_qualidade" | "vicio_quantidade";
   descricao: string | null;
 }
 
-// Hoje sempre retorna vazio — não existe sync de fiscalização/PMQC ainda (ver ARQUITETURA.md).
-// Já busca do banco em vez de mockar pra não precisar tocar nesse arquivo de novo quando existir.
-export async function buscarFiscalizacoesDoPosto(postoId: string): Promise<Fiscalizacao[]> {
-  const { data, error } = await supabase
-    .from("fiscalizacoes")
-    .select("id, tipo, resultado, data_fiscalizacao, descricao")
-    .eq("posto_id", postoId)
-    .order("data_fiscalizacao", { ascending: false })
-    .limit(5);
-  if (error) throw error;
-  return data ?? [];
+export interface FiscalizacaoDetalhe {
+  id: string;
+  numero_df: string | null;
+  data_fiscalizacao: string | null;
+  infracoes: InfracaoResumo[];
+}
+
+export interface AmostraPmqcResumo {
+  id: string;
+  data_coleta: string | null;
+  produto: string | null;
+  conforme: boolean | null;
+}
+
+export interface HistoricoFiscalizacao {
+  fiscalizacoes: FiscalizacaoDetalhe[];
+  amostras: AmostraPmqcResumo[];
+}
+
+// Fiscalizações (Ações de Fiscalização do Abastecimento) e amostras (PMQC) — as duas
+// fontes que alimentam `nota_anp` (ver recalcular_nota_anp na migration
+// 20260808110000). `nota_anp` só é null quando não existe nenhum registro dos dois
+// nos últimos 5 anos — por isso a tela usa esse mesmo sinal pra "ainda não fiscalizado".
+export async function buscarHistoricoFiscalizacao(postoId: string): Promise<HistoricoFiscalizacao> {
+  const [fiscalizacoesResp, amostrasResp] = await Promise.all([
+    supabase
+      .from("fiscalizacoes")
+      .select("id, numero_df, data_fiscalizacao, infracoes(classificacao, descricao)")
+      .eq("posto_id", postoId)
+      .order("data_fiscalizacao", { ascending: false }),
+    supabase
+      .from("amostras_pmqc")
+      .select("id, data_coleta, produto, conforme")
+      .eq("posto_id", postoId)
+      .order("data_coleta", { ascending: false }),
+  ]);
+  if (fiscalizacoesResp.error) throw fiscalizacoesResp.error;
+  if (amostrasResp.error) throw amostrasResp.error;
+  return {
+    fiscalizacoes: (fiscalizacoesResp.data ?? []) as FiscalizacaoDetalhe[],
+    amostras: amostrasResp.data ?? [],
+  };
 }

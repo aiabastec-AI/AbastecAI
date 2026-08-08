@@ -1,0 +1,9 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts locais de backfill que não cabem numa Edge Function (arquivo grande demais pro worker, ou precisa de sessão de navegador pra passar da proteção anti-bot do gov.br).",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

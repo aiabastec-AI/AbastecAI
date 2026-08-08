@@ -8,3 +8,6 @@
 
 # Dependências (quando o projeto ganhar um package.json)
 node_modules
+
+# Dados brutos baixados manualmente pra backfill (grandes demais/não fazem sentido versionar)
+scripts/dados/
