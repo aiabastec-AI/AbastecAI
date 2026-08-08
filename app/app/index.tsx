@@ -263,11 +263,23 @@ export default function MapaScreen() {
           modoTema === "claro" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/dark-v11"
         }
         onMapIdle={aoMapaFicarParado}
+        // Por padrão a barra de escala do Mapbox nasce grudada no topo esquerdo, por cima
+        // de tudo (inclusive da status bar) — reposiciona pra ficar embaixo do
+        // toggle+Buscar/Filtros, e troca de milhas (padrão) pra km.
+        scaleBarEnabled
+        scaleBarPosition={{ top: 168, left: 16 }}
+        scaleBarUnits="metric"
       >
         <Mapbox.Camera
           ref={cameraRef}
           defaultSettings={{ centerCoordinate: CENTRO_INICIAL, zoomLevel: 12 }}
         />
+
+        {/* Pontinho de localização em tempo real (igual Google Maps/Waze/iFood) — nativo
+            do Mapbox, atualiza sozinho com o GPS. Não mexe na câmera automaticamente (o
+            FAB de "minha localização" continua sendo o jeito de recentralizar); se a
+            permissão não foi concedida, simplesmente não desenha nada. */}
+        <Mapbox.UserLocation visible animated showsUserHeadingIndicator androidRenderMode="normal" />
 
         {/* Ícone "squircle" (retângulo bem arredondado) branco, marcado sdf pra poder
             tingir por feature via iconColor — evita precisar de uma imagem por cor. */}

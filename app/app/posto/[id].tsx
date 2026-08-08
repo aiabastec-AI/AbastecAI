@@ -10,6 +10,7 @@ import {
   type PostoDetalhe,
 } from "../../src/lib/postos";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
+import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
@@ -45,7 +46,8 @@ export default function FichaPosto() {
 
   if (erro) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.conteudo]}>
+        <BotaoVoltar />
         <Text style={styles.texto}>{erro}</Text>
       </View>
     );
@@ -53,15 +55,19 @@ export default function FichaPosto() {
 
   if (posto === undefined) {
     return (
-      <View style={[styles.container, styles.centralizado]}>
-        <ActivityIndicator color={colors.textPrimary} />
+      <View style={styles.container}>
+        <BotaoVoltar />
+        <View style={[styles.centralizado, { flex: 1 }]}>
+          <ActivityIndicator color={colors.textPrimary} />
+        </View>
       </View>
     );
   }
 
   if (posto === null) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.conteudo]}>
+        <BotaoVoltar />
         <Text style={styles.texto}>Posto não encontrado.</Text>
       </View>
     );
@@ -77,6 +83,7 @@ export default function FichaPosto() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+      <BotaoVoltar />
       <View style={styles.header}>
         <Text style={styles.nome}>{nome}</Text>
         {posto.nota_anp != null ? (

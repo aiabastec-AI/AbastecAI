@@ -5,6 +5,7 @@ import type { ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
 import { buscarPontoRecargaPorId, type PontoRecargaDetalhe } from "../../src/lib/recarga";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
+import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
@@ -28,7 +29,8 @@ export default function FichaRecarga() {
 
   if (erro) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.conteudo]}>
+        <BotaoVoltar />
         <Text style={styles.texto}>{erro}</Text>
       </View>
     );
@@ -36,15 +38,19 @@ export default function FichaRecarga() {
 
   if (ponto === undefined) {
     return (
-      <View style={[styles.container, styles.centralizado]}>
-        <ActivityIndicator color={colors.textPrimary} />
+      <View style={styles.container}>
+        <BotaoVoltar />
+        <View style={[styles.centralizado, { flex: 1 }]}>
+          <ActivityIndicator color={colors.textPrimary} />
+        </View>
       </View>
     );
   }
 
   if (ponto === null) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.conteudo]}>
+        <BotaoVoltar />
         <Text style={styles.texto}>Ponto de recarga não encontrado.</Text>
       </View>
     );
@@ -57,6 +63,7 @@ export default function FichaRecarga() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+      <BotaoVoltar />
       <View style={styles.header}>
         <Text style={styles.nome}>{ponto.nome}</Text>
         {ponto.potencia_kw != null && (

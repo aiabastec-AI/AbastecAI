@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { BotaoVoltar } from "../src/components/BotaoVoltar";
 
 export default function Login() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
+      <BotaoVoltar />
+      <View style={styles.centralizador}>
       <View style={styles.card}>
         <Text style={styles.titulo}>{modo === "entrar" ? "Entrar" : "Criar conta"}</Text>
         <Text style={styles.subtitulo}>
@@ -95,13 +98,15 @@ export default function Login() {
           </Text>
         </Pressable>
       </View>
+      </View>
     </View>
   );
 }
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, justifyContent: "center", padding: 24 },
+    container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 16 },
+    centralizador: { flex: 1, justifyContent: "center" },
     card: { backgroundColor: colors.card, borderRadius: 20, padding: 24, gap: 12 },
     titulo: { color: colors.textPrimary, fontSize: 22, fontWeight: "700" },
     subtitulo: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 4 },

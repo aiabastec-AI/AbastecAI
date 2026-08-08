@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import type { ThemeColors } from "../src/theme";
 
 export default function Configuracoes() {
@@ -13,7 +14,10 @@ export default function Configuracoes() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>Configurações</Text>
+      <View style={styles.cabecalho}>
+        <BotaoVoltar />
+        <Text style={styles.titulo}>Configurações</Text>
+      </View>
 
       <View style={styles.contaCard}>
         {session ? (
@@ -53,6 +57,7 @@ export default function Configuracoes() {
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
+    cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
     texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
     contaCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 10 },

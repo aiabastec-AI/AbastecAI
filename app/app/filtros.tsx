@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { corDaNota, type ThemeColors } from "../src/theme";
 import { useFiltros } from "../src/lib/filtros";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { BotaoVoltar } from "../src/components/BotaoVoltar";
 
 // Precisa bater com os valores de ConnectionType.Title que a Open Charge Map devolve
 // (ver supabase/functions/sync-ocm) — senão o filtro não casa com nada no banco.
@@ -30,7 +31,10 @@ export default function Filtros() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>Filtros</Text>
+      <View style={styles.cabecalho}>
+        <BotaoVoltar />
+        <Text style={styles.titulo}>Filtros</Text>
+      </View>
 
       <View style={styles.secao}>
         <Text style={styles.rotulo}>Combustível — nota mínima</Text>
@@ -90,6 +94,7 @@ export default function Filtros() {
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 24 },
+    cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
     secao: { gap: 12 },
     rotulo: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },

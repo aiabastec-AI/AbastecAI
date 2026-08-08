@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { buscarFavoritos, type FavoritoItem } from "../src/lib/social";
 
 export default function Favoritos() {
@@ -20,8 +21,11 @@ export default function Favoritos() {
 
   if (carregandoAuth || (usuario && favoritos === null)) {
     return (
-      <View style={[styles.container, styles.centralizado]}>
-        <ActivityIndicator color={colors.textPrimary} />
+      <View style={styles.container}>
+        <BotaoVoltar />
+        <View style={[styles.centralizado, { flex: 1 }]}>
+          <ActivityIndicator color={colors.textPrimary} />
+        </View>
       </View>
     );
   }
@@ -29,6 +33,7 @@ export default function Favoritos() {
   if (!usuario) {
     return (
       <View style={styles.container}>
+        <BotaoVoltar />
         <Text style={styles.titulo}>Favoritos</Text>
         <Text style={styles.texto}>Entra na sua conta pra ver seus favoritos.</Text>
         <Pressable style={styles.botaoPrimario} onPress={() => router.push("/login")}>
@@ -40,6 +45,7 @@ export default function Favoritos() {
 
   return (
     <View style={styles.container}>
+      <BotaoVoltar />
       <Text style={styles.titulo}>Favoritos</Text>
       {favoritos && favoritos.length === 0 ? (
         <Text style={styles.texto}>

@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, Vi
 import { useRouter } from "expo-router";
 import { corDaNota, type ThemeColors } from "../src/theme";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { buscarPostosPorTexto, type PostoResultadoBusca } from "../src/lib/postos";
 import { buscarPontosRecargaPorTexto, type PontoRecargaResultadoBusca } from "../src/lib/recarga";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
@@ -79,7 +80,10 @@ export default function Busca() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>Buscar</Text>
+      <View style={styles.cabecalho}>
+        <BotaoVoltar />
+        <Text style={styles.titulo}>Buscar</Text>
+      </View>
       <TextInput
         style={styles.input}
         placeholder="Cidade, posto ou ponto de recarga"
@@ -145,6 +149,7 @@ export default function Busca() {
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 14 },
+    cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
     input: {
       backgroundColor: colors.card,
