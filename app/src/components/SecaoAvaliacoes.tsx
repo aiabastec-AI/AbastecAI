@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../theme";
+import type { ThemeColors } from "../theme";
 import { useAuth } from "../lib/auth";
+import { useTheme } from "../lib/ThemeProvider";
 import {
   buscarAvaliacoes,
   buscarMinhaAvaliacao,
@@ -18,6 +19,8 @@ function formatarData(iso: string): string {
 export function SecaoAvaliacoes({ alvo }: { alvo: Alvo }) {
   const router = useRouter();
   const { usuario } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [minhaNota, setMinhaNota] = useState(0);
   const [meuComentario, setMeuComentario] = useState("");
@@ -110,42 +113,44 @@ export function SecaoAvaliacoes({ alvo }: { alvo: Alvo }) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 12 },
-  titulo: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
-  aviso: { color: colors.textSecondary, fontSize: 11, marginTop: -8 },
-  texto: { color: colors.textSecondary, fontSize: 13 },
-  formulario: { gap: 10 },
-  estrelas: { flexDirection: "row", gap: 6 },
-  estrela: { fontSize: 26, color: colors.border },
-  estrelaAtiva: { color: colors.notaMedia },
-  input: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.textPrimary,
-    fontSize: 14,
-    minHeight: 44,
-  },
-  botaoSalvar: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  botaoDesabilitado: { opacity: 0.5 },
-  botaoSalvarTexto: { color: colors.background, fontWeight: "700", fontSize: 13 },
-  botaoEntrar: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  botaoEntrarTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
-  avaliacao: { gap: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
-  avaliacaoHeader: { flexDirection: "row", justifyContent: "space-between" },
-  avaliacaoNota: { color: colors.notaMedia, fontSize: 13 },
-  avaliacaoData: { color: colors.textSecondary, fontSize: 11 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 12 },
+    titulo: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
+    aviso: { color: colors.textSecondary, fontSize: 11, marginTop: -8 },
+    texto: { color: colors.textSecondary, fontSize: 13 },
+    formulario: { gap: 10 },
+    estrelas: { flexDirection: "row", gap: 6 },
+    estrela: { fontSize: 26, color: colors.border },
+    estrelaAtiva: { color: colors.notaMedia },
+    input: {
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: colors.textPrimary,
+      fontSize: 14,
+      minHeight: 44,
+    },
+    botaoSalvar: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 12,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    botaoDesabilitado: { opacity: 0.5 },
+    botaoSalvarTexto: { color: colors.background, fontWeight: "700", fontSize: 13 },
+    botaoEntrar: {
+      borderRadius: 12,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    botaoEntrarTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+    avaliacao: { gap: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+    avaliacaoHeader: { flexDirection: "row", justifyContent: "space-between" },
+    avaliacaoNota: { color: colors.notaMedia, fontSize: 13 },
+    avaliacaoData: { color: colors.textSecondary, fontSize: 11 },
+  });
+}

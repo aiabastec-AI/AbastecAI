@@ -1,11 +1,15 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
+import { useTheme } from "../src/lib/ThemeProvider";
+import type { ThemeColors } from "../src/theme";
 
 export default function Configuracoes() {
   const router = useRouter();
   const { session, usuario, sair } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
 
   return (
     <View style={styles.container}>
@@ -46,24 +50,26 @@ export default function Configuracoes() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
-  titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
-  contaCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 10 },
-  botaoPrimario: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
-  botaoSecundario: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
+    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+    contaCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 10 },
+    botaoPrimario: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
+    botaoSecundario: {
+      borderRadius: 12,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+  });
+}

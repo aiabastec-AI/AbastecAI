@@ -1,14 +1,35 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type RefObject,
+} from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Mapbox } from "../src/lib/mapbox";
-import { colors, corDaNota, corDoModo, type ModoMapa } from "../src/theme";
+import { corDaNota, corDoModo, type ModoMapa, type ThemeColors } from "../src/theme";
+import { useTheme } from "../src/lib/ThemeProvider";
 import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
 import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
+import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 
 // Centro inicial: São Paulo, onde a primeira sincronização da ANP rodou (ver ARQUITETURA.md).
 const CENTRO_INICIAL: [number, number] = [-46.6333, -23.5505];
@@ -43,6 +64,8 @@ const STROKE_LARGURA_PIN = ["case", ["==", ["get", "patrocinado"], true], 3, 2] 
 
 export default function MapaScreen() {
   const router = useRouter();
+  const { colors, modo: modoTema } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const cameraRef = useRef<Mapbox.Camera>(null);
   const postosSourceRef = useRef<Mapbox.ShapeSource>(null);
   const recargaSourceRef = useRef<Mapbox.ShapeSource>(null);
@@ -206,10 +229,10 @@ export default function MapaScreen() {
   const postosGeoJSON = useMemo(
     () =>
       paraFeatureCollection(postos, (p) => ({
-        cor: corDaNota(p.nota_anp),
+        cor: corDaNota(p.nota_anp, colors),
         patrocinado: patrocinados.has(p.id),
       })),
-    [postos, patrocinados]
+    [postos, patrocinados, colors]
   );
   const recargaGeoJSON = useMemo(
     () =>
@@ -220,16 +243,36 @@ export default function MapaScreen() {
     [pontosRecarga, patrocinados]
   );
 
+  // "Bottom overlay" do PRD original: lista rápida dos mais próximos, respeitando o
+  // mesmo toggle Combustível/Elétrico/Ambos que já filtra os pins do mapa.
+  const resultadosProximos = useMemo(() => {
+    const itens: ItemProximo[] = [
+      ...(mostrarCombustivel ? postos.map((dado): ItemProximo => ({ tipo: "posto", dado })) : []),
+      ...(mostrarEletrico
+        ? pontosRecarga.map((dado): ItemProximo => ({ tipo: "recarga", dado }))
+        : []),
+    ];
+    return itens.sort((a, b) => a.dado.distancia_m - b.dado.distancia_m).slice(0, 20);
+  }, [postos, pontosRecarga, mostrarCombustivel, mostrarEletrico]);
+
   return (
     <View style={styles.container}>
       <Mapbox.MapView
         style={styles.map}
-        styleURL="mapbox://styles/mapbox/dark-v11"
+        styleURL={
+          modoTema === "claro" ? "mapbox://styles/mapbox/light-v11" : "mapbox://styles/mapbox/dark-v11"
+        }
         onMapIdle={aoMapaFicarParado}
       >
         <Mapbox.Camera
           ref={cameraRef}
           defaultSettings={{ centerCoordinate: CENTRO_INICIAL, zoomLevel: 12 }}
+        />
+
+        {/* Ícone "squircle" (retângulo bem arredondado) branco, marcado sdf pra poder
+            tingir por feature via iconColor — evita precisar de uma imagem por cor. */}
+        <Mapbox.Images
+          images={{ "pin-squircle": { image: require("../assets/map/pin-squircle.png"), sdf: true } }}
         />
 
         {mostrarCombustivel && (
@@ -266,14 +309,17 @@ export default function MapaScreen() {
                 textIgnorePlacement: true,
               }}
             />
-            <Mapbox.CircleLayer
+            <Mapbox.SymbolLayer
               id="postos-individuais"
               filter={["!", ["has", "point_count"]]}
               style={{
-                circleRadius: 9,
-                circleColor: ["get", "cor"],
-                circleStrokeWidth: STROKE_LARGURA_PIN,
-                circleStrokeColor: STROKE_COR_PIN,
+                iconImage: "pin-squircle",
+                iconColor: ["get", "cor"],
+                iconSize: 0.32,
+                iconAllowOverlap: true,
+                iconIgnorePlacement: true,
+                iconHaloColor: STROKE_COR_PIN,
+                iconHaloWidth: STROKE_LARGURA_PIN,
               }}
             />
             {/* Estrelinha sobre o pin patrocinado — postos não têm ícone próprio, então dá
@@ -326,14 +372,17 @@ export default function MapaScreen() {
                 textIgnorePlacement: true,
               }}
             />
-            <Mapbox.CircleLayer
+            <Mapbox.SymbolLayer
               id="recarga-individuais"
               filter={["!", ["has", "point_count"]]}
               style={{
-                circleRadius: 9,
-                circleColor: ["get", "cor"],
-                circleStrokeWidth: STROKE_LARGURA_PIN,
-                circleStrokeColor: STROKE_COR_PIN,
+                iconImage: "pin-squircle",
+                iconColor: ["get", "cor"],
+                iconSize: 0.32,
+                iconAllowOverlap: true,
+                iconIgnorePlacement: true,
+                iconHaloColor: STROKE_COR_PIN,
+                iconHaloWidth: STROKE_LARGURA_PIN,
               }}
             />
             {/* Ícone de raio sobre o pin individual — "pin distinto" do elétrico (PRD 5.2) */}
@@ -354,9 +403,33 @@ export default function MapaScreen() {
 
       <View style={styles.topbar}>
         <View style={styles.toggle}>
-          <ToggleItem label="Combustível" ativo={modo === "combustivel"} cor={colors.combustivel} onPress={() => setModo("combustivel")} />
-          <ToggleItem label="Elétrico" ativo={modo === "eletrico"} cor={colors.eletrico} onPress={() => setModo("eletrico")} />
-          <ToggleItem label="Ambos" ativo={modo === "ambos"} cor={colors.textPrimary} onPress={() => setModo("ambos")} />
+          <ToggleItem
+            icone="gas-station"
+            label="Combustível"
+            ativo={modo === "combustivel"}
+            corFundo={colors.combustivel}
+            corIcone={modo === "combustivel" ? colors.background : colors.textSecondary}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("combustivel")}
+          />
+          <ToggleItem
+            icone="lightning-bolt"
+            label="Elétrico"
+            ativo={modo === "eletrico"}
+            corFundo={colors.eletrico}
+            corIcone={modo === "eletrico" ? colors.background : colors.textSecondary}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("eletrico")}
+          />
+          <ToggleItem
+            icone="map"
+            label="Ambos"
+            ativo={modo === "ambos"}
+            corFundo={colors.textPrimary}
+            corIcone={modo === "ambos" ? colors.background : colors.textSecondary}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("ambos")}
+          />
         </View>
 
         <View style={styles.acoes}>
@@ -381,8 +454,29 @@ export default function MapaScreen() {
         )}
       </View>
 
+      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+        <FlatList
+          style={styles.listaProximos}
+          contentContainerStyle={styles.listaProximosConteudo}
+          data={resultadosProximos}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => `${item.tipo}-${item.dado.id}`}
+          renderItem={({ item }) => (
+            <CardResultadoProximo
+              item={item}
+              colors={colors}
+              patrocinado={patrocinados.has(item.dado.id)}
+              onPress={() =>
+                router.push(item.tipo === "posto" ? `/posto/${item.dado.id}` : `/recarga/${item.dado.id}`)
+              }
+            />
+          )}
+        />
+      )}
+
       <Pressable
-        style={[styles.fab, { borderColor: corDoModo(modo) }]}
+        style={[styles.fab, { borderColor: corDoModo(modo, colors) }]}
         onPress={irParaMinhaLocalizacao}
       >
         <Text style={styles.fabTexto}>📍</Text>
@@ -434,130 +528,148 @@ export default function MapaScreen() {
 }
 
 function ToggleItem({
+  icone,
   label,
   ativo,
-  cor,
+  corFundo,
+  corIcone,
+  estiloItem,
   onPress,
 }: {
+  icone: ComponentProps<typeof MaterialCommunityIcons>["name"];
   label: string;
   ativo: boolean;
-  cor: string;
+  corFundo: string;
+  corIcone: string;
+  estiloItem: StyleProp<ViewStyle>;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.toggleItem, ativo && { backgroundColor: cor }]}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      style={[estiloItem, ativo && { backgroundColor: corFundo }]}
     >
-      <Text style={[styles.toggleTexto, ativo && styles.toggleTextoAtivo]}>{label}</Text>
+      <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  map: { flex: 1 },
-  topbar: {
-    position: "absolute",
-    top: 56,
-    left: 16,
-    right: 16,
-    gap: 10,
-  },
-  toggle: {
-    flexDirection: "row",
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 4,
-    gap: 4,
-  },
-  toggleItem: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  toggleTexto: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
-  toggleTextoAtivo: { color: colors.background },
-  acoes: { flexDirection: "row", gap: 10 },
-  botaoIcone: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  botaoIconeTexto: { color: colors.textPrimary, fontWeight: "600" },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "flex-start",
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  statusBadgeErro: { borderWidth: 1, borderColor: colors.notaBaixa },
-  statusTexto: { color: colors.textSecondary, fontSize: 12 },
-  fab: {
-    position: "absolute",
-    right: 16,
-    bottom: 32,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabTexto: { fontSize: 22 },
-  onboardingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(13, 15, 18, 0.85)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  onboardingCard: {
-    width: "100%",
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 24,
-    gap: 12,
-  },
-  onboardingTitulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  onboardingTexto: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  onboardingAviso: { color: colors.notaBaixa, fontSize: 12 },
-  onboardingDivisor: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 2 },
-  onboardingLinha: { flex: 1, height: 1, backgroundColor: colors.border },
-  onboardingOu: { color: colors.textSecondary, fontSize: 12 },
-  onboardingInput: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  botaoPrimario: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
-  botaoSecundario: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 14 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    map: { flex: 1 },
+    topbar: {
+      position: "absolute",
+      top: 56,
+      left: 16,
+      right: 16,
+      gap: 10,
+    },
+    toggle: {
+      flexDirection: "row",
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 4,
+      gap: 4,
+    },
+    toggleItem: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 16,
+      alignItems: "center",
+    },
+    acoes: { flexDirection: "row", gap: 10 },
+    botaoIcone: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    botaoIconeTexto: { color: colors.textPrimary, fontWeight: "600" },
+    statusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      alignSelf: "flex-start",
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    statusBadgeErro: { borderWidth: 1, borderColor: colors.notaBaixa },
+    statusTexto: { color: colors.textSecondary, fontSize: 12 },
+    fab: {
+      position: "absolute",
+      right: 16,
+      bottom: 32,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    fabTexto: { fontSize: 22 },
+    listaProximos: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 96,
+    },
+    listaProximosConteudo: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    onboardingOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background + "D9",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+    },
+    onboardingCard: {
+      width: "100%",
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      gap: 12,
+    },
+    onboardingTitulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    onboardingTexto: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+    onboardingAviso: { color: colors.notaBaixa, fontSize: 12 },
+    onboardingDivisor: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 2 },
+    onboardingLinha: { flex: 1, height: 1, backgroundColor: colors.border },
+    onboardingOu: { color: colors.textSecondary, fontSize: 12 },
+    onboardingInput: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.textPrimary,
+      fontSize: 15,
+    },
+    botaoPrimario: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+    botaoSecundario: {
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 14 },
+  });
+}

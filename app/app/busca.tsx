@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, corDaNota } from "../src/theme";
+import { corDaNota, type ThemeColors } from "../src/theme";
+import { useTheme } from "../src/lib/ThemeProvider";
 import { buscarPostosPorTexto, type PostoResultadoBusca } from "../src/lib/postos";
 import { buscarPontosRecargaPorTexto, type PontoRecargaResultadoBusca } from "../src/lib/recarga";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
@@ -15,6 +16,8 @@ type ItemResultado =
 
 export default function Busca() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState<ItemResultado[]>([]);
   const [patrocinados, setPatrocinados] = useState<Set<string>>(new Set());
@@ -117,7 +120,7 @@ export default function Busca() {
                 styles.itemMarcador,
                 {
                   backgroundColor:
-                    item.tipo === "posto" ? corDaNota(item.dado.nota_anp) : colors.eletrico,
+                    item.tipo === "posto" ? corDaNota(item.dado.nota_anp, colors) : colors.eletrico,
                 },
               ]}
             />
@@ -139,33 +142,35 @@ export default function Busca() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 14 },
-  titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  input: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  texto: { color: colors.textSecondary, fontSize: 13 },
-  erro: { color: colors.notaBaixa },
-  status: { flexDirection: "row", alignItems: "center", gap: 8 },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  itemMarcador: { width: 10, height: 10, borderRadius: 5 },
-  itemTextos: { flex: 1, gap: 2 },
-  itemNome: { color: colors.textPrimary, fontWeight: "600", fontSize: 14 },
-  itemLocal: { color: colors.textSecondary, fontSize: 12 },
-  itemTipo: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 14 },
+    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    input: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.textPrimary,
+      fontSize: 15,
+    },
+    texto: { color: colors.textSecondary, fontSize: 13 },
+    erro: { color: colors.notaBaixa },
+    status: { flexDirection: "row", alignItems: "center", gap: 8 },
+    item: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 8,
+    },
+    itemMarcador: { width: 10, height: 10, borderRadius: 5 },
+    itemTextos: { flex: 1, gap: 2 },
+    itemNome: { color: colors.textPrimary, fontWeight: "600", fontSize: 14 },
+    itemLocal: { color: colors.textSecondary, fontSize: 12 },
+    itemTipo: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
+  });
+}

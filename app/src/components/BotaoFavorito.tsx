@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../theme";
+import type { ThemeColors } from "../theme";
 import { useAuth } from "../lib/auth";
+import { useTheme } from "../lib/ThemeProvider";
 import { alternarFavorito, buscarFavoritoId, type Alvo } from "../lib/social";
 
 export function BotaoFavorito({ alvo }: { alvo: Alvo }) {
   const router = useRouter();
   const { usuario } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [favoritado, setFavoritado] = useState<boolean | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -52,15 +55,17 @@ export function BotaoFavorito({ alvo }: { alvo: Alvo }) {
   );
 }
 
-const styles = StyleSheet.create({
-  botao: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  textoAtivo: { color: colors.notaMedia, fontWeight: "700", fontSize: 13 },
-  textoInativo: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    botao: {
+      alignSelf: "flex-start",
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    textoAtivo: { color: colors.notaMedia, fontWeight: "700", fontSize: 13 },
+    textoInativo: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+  });
+}

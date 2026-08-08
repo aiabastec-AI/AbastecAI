@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { colors } from "../../src/theme";
+import type { ThemeColors } from "../../src/theme";
+import { useTheme } from "../../src/lib/ThemeProvider";
 import { buscarPontoRecargaPorId, type PontoRecargaDetalhe } from "../../src/lib/recarga";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
@@ -9,6 +10,8 @@ import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 export default function FichaRecarga() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [ponto, setPonto] = useState<PontoRecargaDetalhe | null | undefined>(undefined);
   const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -72,11 +75,11 @@ export default function FichaRecarga() {
       <BotaoFavorito alvo={{ tipo: "recarga", id: ponto.id }} />
 
       <View style={styles.card}>
-        {endereco && <Linha label="Endereço" valor={endereco} />}
+        {endereco && <Linha estilos={styles} label="Endereço" valor={endereco} />}
         {ponto.tipo_conector && ponto.tipo_conector.length > 0 && (
-          <Linha label="Conectores" valor={ponto.tipo_conector.join(", ")} />
+          <Linha estilos={styles} label="Conectores" valor={ponto.tipo_conector.join(", ")} />
         )}
-        {ponto.status && <Linha label="Status" valor={ponto.status} />}
+        {ponto.status && <Linha estilos={styles} label="Status" valor={ponto.status} />}
       </View>
 
       {mapsUrl && (
@@ -90,47 +93,57 @@ export default function FichaRecarga() {
   );
 }
 
-function Linha({ label, valor }: { label: string; valor: string }) {
+function Linha({
+  estilos,
+  label,
+  valor,
+}: {
+  estilos: ReturnType<typeof criarEstilos>;
+  label: string;
+  valor: string;
+}) {
   return (
-    <View style={styles.linha}>
-      <Text style={styles.linhaLabel}>{label}</Text>
-      <Text style={styles.linhaValor}>{valor}</Text>
+    <View style={estilos.linha}>
+      <Text style={estilos.linhaLabel}>{label}</Text>
+      <Text style={estilos.linhaValor}>{valor}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  centralizado: { alignItems: "center", justifyContent: "center" },
-  conteudo: { padding: 20, gap: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  nome: { color: colors.textPrimary, fontSize: 22, fontWeight: "700", flexShrink: 1 },
-  potenciaBadge: {
-    backgroundColor: colors.eletrico,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  potenciaTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
-  operador: { color: colors.textSecondary, fontSize: 14 },
-  patrocinadoBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.notaMedia,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  patrocinadoTexto: { color: colors.background, fontWeight: "700", fontSize: 11 },
-  card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 10 },
-  linha: { gap: 2 },
-  linhaLabel: { color: colors.textSecondary, fontSize: 12 },
-  linhaValor: { color: colors.textPrimary, fontSize: 15 },
-  texto: { color: colors.textSecondary, fontSize: 13 },
-  botaoPrimario: {
-    backgroundColor: colors.eletrico,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centralizado: { alignItems: "center", justifyContent: "center" },
+    conteudo: { padding: 20, gap: 16 },
+    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    nome: { color: colors.textPrimary, fontSize: 22, fontWeight: "700", flexShrink: 1 },
+    potenciaBadge: {
+      backgroundColor: colors.eletrico,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    potenciaTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
+    operador: { color: colors.textSecondary, fontSize: 14 },
+    patrocinadoBadge: {
+      alignSelf: "flex-start",
+      backgroundColor: colors.notaMedia,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 10,
+    },
+    patrocinadoTexto: { color: colors.background, fontWeight: "700", fontSize: 11 },
+    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 10 },
+    linha: { gap: 2 },
+    linhaLabel: { color: colors.textSecondary, fontSize: 12 },
+    linhaValor: { color: colors.textPrimary, fontSize: 15 },
+    texto: { color: colors.textSecondary, fontSize: 13 },
+    botaoPrimario: {
+      backgroundColor: colors.eletrico,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+  });
+}

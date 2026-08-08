@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../src/theme";
+import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
+import { useTheme } from "../src/lib/ThemeProvider";
 import { buscarFavoritos, type FavoritoItem } from "../src/lib/social";
 
 export default function Favoritos() {
   const router = useRouter();
   const { usuario, carregando: carregandoAuth } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [favoritos, setFavoritos] = useState<FavoritoItem[] | null>(null);
 
   useEffect(() => {
@@ -62,18 +65,20 @@ export default function Favoritos() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
-  centralizado: { alignItems: "center", justifyContent: "center" },
-  titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
-  card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 4 },
-  cardNome: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
-  botaoPrimario: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
+    centralizado: { alignItems: "center", justifyContent: "center" },
+    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 4 },
+    cardNome: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
+    botaoPrimario: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
+  });
+}

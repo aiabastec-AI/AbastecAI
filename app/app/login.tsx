@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../src/theme";
+import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
+import { useTheme } from "../src/lib/ThemeProvider";
 
 export default function Login() {
   const router = useRouter();
   const { entrar, cadastrar } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -96,28 +99,30 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, justifyContent: "center", padding: 24 },
-  card: { backgroundColor: colors.card, borderRadius: 20, padding: 24, gap: 12 },
-  titulo: { color: colors.textPrimary, fontSize: 22, fontWeight: "700" },
-  subtitulo: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 4 },
-  input: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  aviso: { color: colors.notaBaixa, fontSize: 12 },
-  botaoPrimario: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
-  botaoSecundario: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
-  botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
-});
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, justifyContent: "center", padding: 24 },
+    card: { backgroundColor: colors.card, borderRadius: 20, padding: 24, gap: 12 },
+    titulo: { color: colors.textPrimary, fontSize: 22, fontWeight: "700" },
+    subtitulo: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 4 },
+    input: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.textPrimary,
+      fontSize: 15,
+    },
+    aviso: { color: colors.notaBaixa, fontSize: 12 },
+    botaoPrimario: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginTop: 4,
+    },
+    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+    botaoSecundario: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+  });
+}
