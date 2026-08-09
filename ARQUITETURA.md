@@ -424,3 +424,33 @@ O usuário quer manter `abastec-ai.vercel.app` reservado especificamente pro pai
 - [ ] **EAS Build + contas de desenvolvedor** (Google Play Console, Apple Developer) — ainda não iniciado.
 - [ ] **Política de privacidade** — obrigatória nas duas lojas, ainda não existe.
 - [ ] Senha do admin master (`aiabastec@gmail.com` / `123456`) é fraca de propósito — trocar antes de dar acesso a mais gente.
+
+## 15. Mapa web: pins redondos, rota in-app, drag corrigido, histórico progressivo (2026-08-09)
+
+Sessão de refinamento a partir de feedback direto testando o app no ar, mais uma visão maior do usuário: quer a experiência do AbastecAI (web e, depois, mobile) o mais parecida possível com o Google Maps — tudo dentro do app, sem depender de abrir o Google Maps de verdade pra nada.
+
+### 15.1 Bug real: mapa "não deixava arrastar"
+
+Causa raiz, achada só depois de descartar várias hipóteses erradas (ícone de marker bloqueando drag nativo do navegador, `gestureHandling` mal configurado — nenhuma das duas era o problema real): `<Map center={centroMapa} zoom={zoomMapa}>` usa **props controladas**. `aoCameraMudar` (o handler de pan/zoom) só disparava um refetch de dados — nunca escrevia a posição nova de volta em `centroMapa`/`zoomMapa`. Qualquer re-render depois de um arrastar (ex.: `carregarDados` terminando) fazia o `@vis.gl/react-google-maps` forçar o mapa de volta pro último valor que essas props controladas realmente tinham — na prática, o mapa "voltava" pro lugar de antes assim que soltava o botão do mouse. Fix: `aoCameraMudar` agora chama `setCentroMapa`/`setZoomMapa` também, não só `carregarDados`. Confirmado via Playwright com um drag de verdade (mousedown/mousemove com botão segurado/mouseup) comparando os rótulos de rua antes/depois.
+
+### 15.2 Pins redondos (igual ao nativo)
+
+`src/lib/pinSvg.ts` reescrito pra copiar o desenho que `PinMapa.tsx` (nativo) já tinha: círculo com fundo escuro (`#171A1F`), anel colorido pela nota (ou dourado se patrocinado), nota/raio na cor dentro, e uma hastezinha embaixo apontando pro ponto real — âncora do ícone fica na ponta da haste, não no centro do círculo. Tamanho reduzido (28px de diâmetro, era 40).
+
+### 15.3 Rota in-app (sem sair pro Google Maps)
+
+- Migration `20260809150000_latitude_longitude_colunas.sql`: `latitude`/`longitude` viram colunas geradas (`ST_Y`/`ST_X` sobre `localizacao`) em `postos` e `pontos_recarga` — antes só existiam dentro das RPCs de busca por raio; `buscarPostoPorId`/`buscarPontoRecargaPorId` (busca direta por id) não tinham como pedir isso.
+- `FichaPosto`/`FichaRecarga` ganharam uma prop opcional `aoTracarRota`. O painel do mapa web passa essa função (desenha a rota no próprio mapa); a rota cheia (nativo + link direto na web, sem mapa por perto pra desenhar em cima) cai no fallback de abrir o Google Maps externo mesmo — inevitável nesse caso.
+- `RotaOverlay` (novo, filho de `<Map>`) usa `useMap()`/`useMapsLibrary("routes")` — mesmo cuidado de carregamento assíncrono documentado em `pinSvg.ts` pro `Size`/`Point` — pra pegar `DirectionsService`/`DirectionsRenderer` só depois que a lib "routes" carregou de verdade, e desenha a rota (`DirectionsRenderer.setMap`) direto no mapa existente. Origem é a última localização real do usuário (pedida na hora se ainda não tiver).
+- **Pendência descoberta e resolvida na hora**: a Directions API não estava habilitada no projeto GCP (`abastecai`) nem na chave web restrita (só tinha `maps-backend.googleapis.com` nos `apiTargets`, ver seção 14.1). Habilitada via `gcloud services enable directions-backend.googleapis.com` e adicionada aos `apiTargets` da chave web. **As chaves Android/iOS ainda não têm isso** — só importa quando a rota in-app for implementada no nativo também (fora de escopo desta rodada).
+- `DirectionsService`/`DirectionsRenderer` mostram aviso de depreciação no console (Google recomenda migrar pra `google.maps.routes.Route.computeRoutes` eventualmente) — "not scheduled to be discontinued", sem prazo, não bloqueia nada agora.
+
+### 15.4 Histórico de fiscalização progressivo
+
+`FichaPosto`: mostra só as 2 primeiras fiscalizações por padrão, com um "Ver mais N" que expande a lista completa — evita a ficha ficar poluída em postos com histórico longo.
+
+### 15.5 O que ficou pra depois (pedido explícito do usuário, escopo grande)
+
+- [ ] **Preços colaborativos** — usuários sugerindo o preço do combustível em cada posto, mostrado no card/ficha. Precisa de tabela nova + RLS + UI, seguindo o mesmo padrão de `avaliacoes_usuario`.
+- [ ] **Mesma experiência (pins redondos, rota in-app) no app nativo** — hoje só a web tem os pins redondos com nota e a rota desenhada dentro do app; nativo (`app/index.tsx`, `posto/[id].tsx`/`recarga/[id].tsx` fora do painel web) continua com o link externo do Google Maps.
+- [ ] Card com foto do posto — pedido pelo usuário, mas não existe fonte de dado real pra isso (ANP não fornece fotos); ficou de fora até decidir se é foto de usuário, stock genérico, ou outra fonte.
