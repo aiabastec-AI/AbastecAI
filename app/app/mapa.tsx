@@ -35,7 +35,18 @@ import { CardResultadoProximo, type ItemProximo } from "../src/components/CardRe
 // escopo futuro — desktop tem mouse+scroll, o problema de "pins empilhados" é bem menor que no touch).
 const CENTRO_INICIAL_LAT = -23.5505;
 const CENTRO_INICIAL_LNG = -46.6333;
-const RAIO_BUSCA_M = 15000;
+
+// Raio de busca escalado pelo zoom (em vez de um valor fixo) — sem isso, dar zoom out
+// só afasta a câmera sem trazer postos de mais longe, porque a busca continuava limitada
+// aos mesmos poucos km ao redor do centro. Fórmula padrão de resolução de mapa (metros por
+// pixel em cada zoom), multiplicada por uma janela de ~700px pra cobrir a área visível com
+// folga. Clampado pra não pedir um raio ínfimo no zoom máximo nem estourar o limite de linhas
+// da RPC (já capado em 200, mas não faz sentido pedir raio de milhares de km) no mínimo.
+function raioBuscaM(zoom: number, lat: number): number {
+  const metrosPorPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+  const raio = metrosPorPixel * 700;
+  return Math.min(Math.max(raio, 3000), 150000);
+}
 
 const GOOGLE_MAPS_WEB_API_KEY = Constants.expoConfig?.extra?.googleMapsWebApiKey as string | undefined;
 
@@ -60,6 +71,7 @@ export default function MapaWebScreen() {
   const [erro, setErro] = useState<string | null>(null);
   const { notaMinima, conectoresAtivos } = useFiltros();
   const centroAtualRef = useRef({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
+  const zoomAtualRef = useRef(12);
   const [centroMapa, setCentroMapa] = useState({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
   const [zoomMapa, setZoomMapa] = useState(12);
 
@@ -75,9 +87,10 @@ export default function MapaWebScreen() {
       setCarregando(true);
       setErro(null);
       try {
+        const raioM = raioBuscaM(zoomAtualRef.current, lat);
         const [postosResultado, recargaResultado] = await Promise.all([
-          buscarPostosProximos(lat, lng, RAIO_BUSCA_M, notaMinima),
-          buscarPontosRecargaProximos(lat, lng, RAIO_BUSCA_M, conectoresAtivos),
+          buscarPostosProximos(lat, lng, raioM, notaMinima),
+          buscarPontosRecargaProximos(lat, lng, raioM, conectoresAtivos),
         ]);
         setPostos(postosResultado);
         setPontosRecarga(recargaResultado);
@@ -103,6 +116,7 @@ export default function MapaWebScreen() {
   }, [carregarDados]);
 
   function irParaCoordenada(lat: number, lng: number, zoom: number) {
+    zoomAtualRef.current = zoom;
     setCentroMapa({ lat, lng });
     setZoomMapa(zoom);
     carregarDados(lat, lng);
@@ -126,21 +140,35 @@ export default function MapaWebScreen() {
   }, []);
 
   async function irParaMinhaLocalizacao() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
-    const posicao = await Location.getCurrentPositionAsync({});
-    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setErro("Permissão de localização negada pelo navegador.");
+        return;
+      }
+      const posicao = await Location.getCurrentPositionAsync({});
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+    } catch (e) {
+      const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
+      setErro(mensagem);
+    }
   }
 
   async function aoPermitirLocalizacaoOnboarding() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setPermissaoNegada(true);
+        return;
+      }
+      setMostrarOnboarding(false);
+      const posicao = await Location.getCurrentPositionAsync({});
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+    } catch {
+      // Falha ao obter posição (GPS indisponível, timeout etc.) — mesma mensagem da negação
+      // explícita, já que daqui o usuário só tem mesmo a saída de digitar a cidade.
       setPermissaoNegada(true);
-      return;
     }
-    setMostrarOnboarding(false);
-    const posicao = await Location.getCurrentPositionAsync({});
-    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
   }
 
   async function aoBuscarCidadeOnboarding() {
@@ -165,7 +193,8 @@ export default function MapaWebScreen() {
   }
 
   function aoCameraMudar(evento: MapCameraChangedEvent) {
-    const { center } = evento.detail;
+    const { center, zoom } = evento.detail;
+    zoomAtualRef.current = zoom;
     carregarDados(center.lat, center.lng);
   }
 
@@ -231,7 +260,10 @@ export default function MapaWebScreen() {
           zoom={zoomMapa}
           onCenterChanged={() => {}}
           onCameraChanged={aoCameraMudar}
-          onZoomChanged={(e) => setZoomMapa(e.detail.zoom)}
+          onZoomChanged={(e) => {
+            zoomAtualRef.current = e.detail.zoom;
+            setZoomMapa(e.detail.zoom);
+          }}
           styles={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
           disableDefaultUI={false}
           fullscreenControl={false}

@@ -12,9 +12,14 @@ export function criarIconePin(cor: string, patrocinado: boolean, tamanho = 34): 
     <rect x="${larguraBorda / 2}" y="${larguraBorda / 2}" width="${tamanho - larguraBorda}" height="${tamanho - larguraBorda}"
       rx="${raio}" ry="${raio}" fill="${cor}" stroke="${corBorda}" stroke-width="${larguraBorda}" />
   </svg>`;
+  // Objeto literal em vez de `new google.maps.Size/Point(...)` de propósito: com o loader
+  // assíncrono da Maps JS API (@vis.gl/react-google-maps usa `loading=async`), essas classes
+  // só viram construtores de verdade depois de `importLibrary("core")` — chamá-las direto
+  // pode disparar "google.maps.Size is not a constructor" dependendo da ordem de carregamento.
+  // O SDK só lê as propriedades width/height/x/y, então o literal funciona igual.
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(tamanho, tamanho),
-    anchor: new google.maps.Point(tamanho / 2, tamanho / 2),
+    scaledSize: { width: tamanho, height: tamanho } as google.maps.Size,
+    anchor: { x: tamanho / 2, y: tamanho / 2 } as google.maps.Point,
   };
 }
