@@ -23,6 +23,8 @@ export interface PostoDetalhe {
   uf: string | null;
   nota_anp: number | null;
   situacao_cadastral: string | null;
+  latitude: number;
+  longitude: number;
 }
 
 export async function buscarPostosProximos(
@@ -79,7 +81,7 @@ export async function buscarPostoPorId(id: string): Promise<PostoDetalhe | null>
   const { data, error } = await supabase
     .from("postos")
     .select(
-      "id, cnpj, razao_social, nome_fantasia, bandeira, distribuidora_atual, endereco, cidade, uf, nota_anp, situacao_cadastral"
+      "id, cnpj, razao_social, nome_fantasia, bandeira, distribuidora_atual, endereco, cidade, uf, nota_anp, situacao_cadastral, latitude, longitude"
     )
     .eq("id", id)
     .maybeSingle();

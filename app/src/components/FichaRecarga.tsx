@@ -23,7 +23,16 @@ function iconeConector(tipo: string): ComponentProps<typeof MaterialCommunityIco
 // Só o conteúdo da ficha (sem ScrollView/BotaoVoltar) — reaproveitado tanto pela rota cheia
 // (app/recarga/[id].tsx, usada no nativo e em link direto na web) quanto pelo painel lateral
 // do mapa web (app/mapa.tsx), que só muda a casca ao redor, não o conteúdo em si.
-export function FichaRecarga({ id }: { id: string }) {
+export function FichaRecarga({
+  id,
+  aoTracarRota,
+}: {
+  id: string;
+  // Painel do mapa web passa isso pra desenhar a rota no próprio mapa (sem sair do app).
+  // Sem essa prop (rota cheia, sem mapa por perto pra desenhar em cima), cai no fallback de
+  // abrir o Google Maps externo — inevitável nesse caso, não tem onde desenhar a rota.
+  aoTracarRota?: (destino: { lat: number; lng: number }) => void;
+}) {
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [ponto, setPonto] = useState<PontoRecargaDetalhe | null | undefined>(undefined);
@@ -115,7 +124,16 @@ export function FichaRecarga({ id }: { id: string }) {
       )}
 
       {mapsUrl && (
-        <Pressable style={styles.botaoPrimario} onPress={() => Linking.openURL(mapsUrl)}>
+        <Pressable
+          style={styles.botaoPrimario}
+          onPress={() => {
+            if (aoTracarRota) {
+              aoTracarRota({ lat: ponto.latitude, lng: ponto.longitude });
+            } else {
+              Linking.openURL(mapsUrl);
+            }
+          }}
+        >
           <Text style={styles.botaoPrimarioTexto}>Traçar rota</Text>
         </Pressable>
       )}

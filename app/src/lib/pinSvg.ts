@@ -1,26 +1,35 @@
 /// <reference types="google.maps" />
-// Equivalente web do PinMapa.tsx (que usa uma View React, só válido em React Native).
-// O Marker clássico do Google Maps JS (google.maps.Marker, usado em vez do AdvancedMarker
-// de propósito — AdvancedMarker exige criar um "Map ID" à parte no Cloud Console, setup
-// extra que não vale a pena só pra colorir um pin) só aceita imagem/ícone, não JSX — então
-// geramos o mesmo squircle como SVG embutido em data URI, com a nota (ou "⚡" pro elétrico)
-// escrita dentro — só a cor não deixava claro o valor, o usuário só via a cor no mapa.
+// Equivalente web do PinMapa.tsx (que usa Views React, só válido em React Native): mesmo
+// desenho — anel colorido, fundo escuro, nota (ou "⚡" pro elétrico) na cor, com uma
+// hastezinha embaixo apontando pro ponto exato — igual um pin de localização do Google Maps,
+// só que redondo em vez do balão clássico. O Marker clássico do Google Maps JS
+// (google.maps.Marker, usado em vez do AdvancedMarker de propósito — AdvancedMarker exige
+// criar um "Map ID" à parte no Cloud Console, setup extra que não vale a pena só pra colorir
+// um pin) só aceita imagem/ícone, não JSX — então geramos esse desenho como SVG em data URI.
+const COR_FUNDO = "#171A1F";
+
 export function criarIconePin(
   cor: string,
   patrocinado: boolean,
   texto?: string,
-  tamanho = 40
+  diametro = 28
 ): google.maps.Icon {
-  const raio = tamanho * 0.32;
-  const corBorda = patrocinado ? "#F5A623" : "#FFFFFF";
-  const larguraBorda = patrocinado ? 3 : 2;
-  const fontSize = texto && texto.length > 2 ? tamanho * 0.34 : tamanho * 0.4;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${tamanho}" height="${tamanho}">
-    <rect x="${larguraBorda / 2}" y="${larguraBorda / 2}" width="${tamanho - larguraBorda}" height="${tamanho - larguraBorda}"
-      rx="${raio}" ry="${raio}" fill="${cor}" stroke="${corBorda}" stroke-width="${larguraBorda}" />
+  const corBorda = patrocinado ? "#F5A623" : cor;
+  const larguraBorda = patrocinado ? 3.5 : 3;
+  const raio = (diametro - larguraBorda) / 2;
+  const centro = diametro / 2;
+  const alturaHaste = 9;
+  const larguraHaste = 5;
+  const altura = diametro + alturaHaste;
+  const fontSize = texto && texto.length > 2 ? diametro * 0.32 : diametro * 0.4;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${diametro}" height="${altura}">
+    <rect x="${centro - larguraHaste / 2}" y="${diametro - 3}" width="${larguraHaste}" height="${alturaHaste}"
+      rx="${larguraHaste / 2}" fill="${cor}" />
+    <circle cx="${centro}" cy="${centro}" r="${raio}" fill="${COR_FUNDO}" stroke="${corBorda}" stroke-width="${larguraBorda}" />
     ${
       texto
-        ? `<text x="50%" y="53%" text-anchor="middle" dominant-baseline="middle" fill="#0D0F12"
+        ? `<text x="${centro}" y="${centro + fontSize * 0.36}" text-anchor="middle" fill="${cor}"
             font-family="Arial, sans-serif" font-weight="700" font-size="${fontSize}">${texto}</text>`
         : ""
     }
@@ -30,9 +39,11 @@ export function criarIconePin(
   // só viram construtores de verdade depois de `importLibrary("core")` — chamá-las direto
   // pode disparar "google.maps.Size is not a constructor" dependendo da ordem de carregamento.
   // O SDK só lê as propriedades width/height/x/y, então o literal funciona igual.
+  // Âncora na ponta da haste (embaixo, centralizado) — é ali que fica a coordenada real,
+  // não no centro do círculo, senão o pin "flutua" deslocado do ponto de verdade.
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: { width: tamanho, height: tamanho } as google.maps.Size,
-    anchor: { x: tamanho / 2, y: tamanho / 2 } as google.maps.Point,
+    scaledSize: { width: diametro, height: altura } as google.maps.Size,
+    anchor: { x: centro, y: altura } as google.maps.Point,
   };
 }

@@ -22,6 +22,8 @@ export interface PontoRecargaDetalhe {
   potencia_kw: number | null;
   status: string | null;
   operador: string | null;
+  latitude: number;
+  longitude: number;
 }
 
 export async function buscarPontosRecargaProximos(
@@ -74,7 +76,9 @@ export async function buscarPontosRecargaPorTexto(
 export async function buscarPontoRecargaPorId(id: string): Promise<PontoRecargaDetalhe | null> {
   const { data, error } = await supabase
     .from("pontos_recarga")
-    .select("id, nome, endereco, cidade, uf, tipo_conector, potencia_kw, status, redes_recarga(nome)")
+    .select(
+      "id, nome, endereco, cidade, uf, tipo_conector, potencia_kw, status, latitude, longitude, redes_recarga(nome)"
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;

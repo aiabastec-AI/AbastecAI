@@ -16,22 +16,35 @@ import { buscarIdsPatrocinados } from "../lib/patrocinios";
 
 const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: [] };
 
+const HISTORICO_VISIVEL_INICIAL = 2;
+
 // Só o conteúdo da ficha (sem ScrollView/BotaoVoltar) — reaproveitado tanto pela rota cheia
 // (app/posto/[id].tsx, usada no nativo e em link direto na web) quanto pelo painel lateral
 // do mapa web (app/mapa.tsx), que só muda a casca ao redor, não o conteúdo em si.
-export function FichaPosto({ id }: { id: string }) {
+export function FichaPosto({
+  id,
+  aoTracarRota,
+}: {
+  id: string;
+  // Painel do mapa web passa isso pra desenhar a rota no próprio mapa (sem sair do app).
+  // Sem essa prop (rota cheia, sem mapa por perto pra desenhar em cima), cai no fallback de
+  // abrir o Google Maps externo — inevitável nesse caso, não tem onde desenhar a rota.
+  aoTracarRota?: (destino: { lat: number; lng: number }) => void;
+}) {
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [historico, setHistorico] = useState<HistoricoFiscalizacao>(HISTORICO_VAZIO);
   const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [historicoExpandido, setHistoricoExpandido] = useState(false);
 
   useEffect(() => {
     setPosto(undefined);
     setHistorico(HISTORICO_VAZIO);
     setPatrocinado(false);
     setErro(null);
+    setHistoricoExpandido(false);
     if (!id) return;
     buscarPostoPorId(id)
       .then(setPosto)
@@ -132,7 +145,10 @@ export function FichaPosto({ id }: { id: string }) {
               {historico.amostras.length === 1 ? "" : "s"}
               {totalAmostrasNaoConformes > 0 ? `, ${totalAmostrasNaoConformes} não conforme${totalAmostrasNaoConformes === 1 ? "" : "s"}` : ""}
             </Text>
-            {historico.fiscalizacoes.map((f) => (
+            {(historicoExpandido
+              ? historico.fiscalizacoes
+              : historico.fiscalizacoes.slice(0, HISTORICO_VISIVEL_INICIAL)
+            ).map((f) => (
               <View key={f.id} style={styles.linha}>
                 <Text style={styles.linhaLabel}>
                   {f.data_fiscalizacao ?? "Data não informada"}
@@ -145,15 +161,31 @@ export function FichaPosto({ id }: { id: string }) {
                 </Text>
               </View>
             ))}
+            {!historicoExpandido && historico.fiscalizacoes.length > HISTORICO_VISIVEL_INICIAL && (
+              <Pressable onPress={() => setHistoricoExpandido(true)}>
+                <Text style={styles.verMaisTexto}>
+                  Ver mais {historico.fiscalizacoes.length - HISTORICO_VISIVEL_INICIAL}
+                </Text>
+              </Pressable>
+            )}
           </>
         )}
       </View>
 
-      {mapsUrl && (
-        <Pressable style={styles.botaoPrimario} onPress={() => Linking.openURL(mapsUrl)}>
+      {(posto.latitude != null && posto.longitude != null) || mapsUrl ? (
+        <Pressable
+          style={styles.botaoPrimario}
+          onPress={() => {
+            if (aoTracarRota && posto.latitude != null && posto.longitude != null) {
+              aoTracarRota({ lat: posto.latitude, lng: posto.longitude });
+            } else if (mapsUrl) {
+              Linking.openURL(mapsUrl);
+            }
+          }}
+        >
           <Text style={styles.botaoPrimarioTexto}>Traçar rota</Text>
         </Pressable>
-      )}
+      ) : null}
 
       <Pressable
         style={styles.botaoSecundario}
@@ -208,6 +240,7 @@ function criarEstilos(colors: ThemeColors) {
     linha: { gap: 2 },
     linhaLabel: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 11 },
     linhaValor: { ...tipografia.bodyMd, color: colors.textPrimary, fontSize: 15, lineHeight: 20 },
+    verMaisTexto: { color: colors.eletrico, fontFamily: "Inter_600SemiBold", fontSize: 13, marginTop: 2 },
     texto: { ...tipografia.bodySm, color: colors.textSecondary, padding: 20 },
     botaoPrimario: {
       backgroundColor: colors.combustivel,

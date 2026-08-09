@@ -15,7 +15,14 @@ import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { useAuth } from "../src/lib/auth";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { APIProvider, Map, Marker, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
+import {
+  APIProvider,
+  Map,
+  Marker,
+  useMap,
+  useMapsLibrary,
+  type MapCameraChangedEvent,
+} from "@vis.gl/react-google-maps";
 import Constants from "expo-constants";
 import { corDaNota, corDoModo, glowDoModo, type ModoMapa, type ThemeColors } from "../src/theme";
 import { useTheme } from "../src/lib/ThemeProvider";
@@ -105,6 +112,39 @@ export default function MapaWebScreen() {
   // juntos, então um estado com as duas opções em vez de dois booleanos independentes.
   const [painelEsquerdo, setPainelEsquerdo] = useState<"busca" | "config" | null>(null);
 
+  // Última localização real do usuário — usada como origem da rota (o botão "Traçar rota"
+  // desenha no próprio mapa em vez de abrir o Google Maps externo). Guardado num ref (não
+  // precisa re-renderizar quando muda) e atualizado toda vez que conseguimos um fix de GPS
+  // em qualquer um dos fluxos que já pedem localização (onboarding, botão de "minha localização").
+  const minhaLocalizacaoRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [rotaDestino, setRotaDestino] = useState<{ lat: number; lng: number } | null>(null);
+  const [rotaOrigem, setRotaOrigem] = useState<{ lat: number; lng: number } | null>(null);
+  const [calculandoRota, setCalculandoRota] = useState(false);
+
+  async function aoTracarRota(destino: { lat: number; lng: number }) {
+    if (!minhaLocalizacaoRef.current) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setErro("Preciso da sua localização pra traçar a rota.");
+          return;
+        }
+        const posicao = await Location.getCurrentPositionAsync({});
+        minhaLocalizacaoRef.current = {
+          lat: posicao.coords.latitude,
+          lng: posicao.coords.longitude,
+        };
+      } catch (e) {
+        const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
+        setErro(mensagem);
+        return;
+      }
+    }
+    setCalculandoRota(true);
+    setRotaOrigem(minhaLocalizacaoRef.current);
+    setRotaDestino(destino);
+  }
+
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [permissaoNegada, setPermissaoNegada] = useState(false);
   const [cidadeDigitada, setCidadeDigitada] = useState("");
@@ -158,6 +198,7 @@ export default function MapaWebScreen() {
       if (status === Location.PermissionStatus.GRANTED) {
         try {
           const posicao = await Location.getCurrentPositionAsync({});
+          minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
           irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
         } catch {
           // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
@@ -177,6 +218,7 @@ export default function MapaWebScreen() {
         return;
       }
       const posicao = await Location.getCurrentPositionAsync({});
+      minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
     } catch (e) {
       const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
@@ -193,6 +235,7 @@ export default function MapaWebScreen() {
       }
       setMostrarOnboarding(false);
       const posicao = await Location.getCurrentPositionAsync({});
+      minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
     } catch {
       // Falha ao obter posição (GPS indisponível, timeout etc.) — mesma mensagem da negação
@@ -302,6 +345,8 @@ export default function MapaWebScreen() {
           onClick={() => {
             setSelecionado(null);
             setPainelEsquerdo(null);
+            setRotaOrigem(null);
+            setRotaDestino(null);
           }}
           onZoomChanged={(e) => {
             zoomAtualRef.current = e.detail.zoom;
@@ -321,6 +366,16 @@ export default function MapaWebScreen() {
               onClick={() => setSelecionado({ tipo: item.tipo, id: item.id })}
             />
           ))}
+          {rotaOrigem && rotaDestino && (
+            <RotaOverlay
+              origem={rotaOrigem}
+              destino={rotaDestino}
+              aoCalcular={(sucesso) => {
+                setCalculandoRota(false);
+                if (!sucesso) setErro("Não foi possível calcular a rota.");
+              }}
+            />
+          )}
         </Map>
       </APIProvider>
 
@@ -386,6 +441,24 @@ export default function MapaWebScreen() {
           {erro && !carregando && (
             <View style={[styles.statusBadge, styles.statusBadgeErro]}>
               <Text style={styles.statusTexto}>{erro}</Text>
+            </View>
+          )}
+          {(calculandoRota || (rotaOrigem && rotaDestino)) && (
+            <View style={styles.statusBadge}>
+              {calculandoRota && <ActivityIndicator size="small" color={colors.textPrimary} />}
+              <Text style={styles.statusTexto}>
+                {calculandoRota ? "Calculando rota…" : "Mostrando rota"}
+              </Text>
+              {!calculandoRota && (
+                <Pressable
+                  onPress={() => {
+                    setRotaOrigem(null);
+                    setRotaDestino(null);
+                  }}
+                >
+                  <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
+                </Pressable>
+              )}
             </View>
           )}
         </View>
@@ -477,9 +550,9 @@ export default function MapaWebScreen() {
           </View>
           <ScrollView style={styles.painelScroll} contentContainerStyle={styles.painelConteudo}>
             {selecionado.tipo === "posto" ? (
-              <FichaPosto id={selecionado.id} />
+              <FichaPosto id={selecionado.id} aoTracarRota={aoTracarRota} />
             ) : (
-              <FichaRecarga id={selecionado.id} />
+              <FichaRecarga id={selecionado.id} aoTracarRota={aoTracarRota} />
             )}
           </ScrollView>
         </View>
@@ -847,6 +920,66 @@ function criarEstilosPainelBusca(colors: ThemeColors) {
     resultadoNome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
     resultadoLocal: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
   });
+}
+
+// Filho do <Map> (precisa estar dentro do <APIProvider>/<Map> pra useMap()/useMapsLibrary()
+// funcionarem) — calcula a rota via DirectionsService e desenha via DirectionsRenderer direto
+// no mapa, em vez de abrir o Google Maps externo. `useMapsLibrary("routes")` é o jeito
+// assíncrono certo de pegar essas classes (ver o mesmo cuidado em pinSvg.ts com Size/Point —
+// `new google.maps.DirectionsService()` direto também pode quebrar antes da lib carregar).
+function RotaOverlay({
+  origem,
+  destino,
+  aoCalcular,
+}: {
+  origem: { lat: number; lng: number };
+  destino: { lat: number; lng: number };
+  aoCalcular: (sucesso: boolean) => void;
+}) {
+  const map = useMap();
+  const rotas = useMapsLibrary("routes");
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+
+  useEffect(() => {
+    if (!map || !rotas) return;
+
+    if (!rendererRef.current) {
+      rendererRef.current = new rotas.DirectionsRenderer({ map, suppressMarkers: true });
+    }
+    const servico = new rotas.DirectionsService();
+    let cancelado = false;
+
+    servico.route(
+      {
+        origin: origem,
+        destination: destino,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (resultado, status) => {
+        if (cancelado) return;
+        if (status === "OK" && resultado && rendererRef.current) {
+          rendererRef.current.setDirections(resultado);
+          aoCalcular(true);
+        } else {
+          aoCalcular(false);
+        }
+      }
+    );
+
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, rotas, origem.lat, origem.lng, destino.lat, destino.lng]);
+
+  useEffect(() => {
+    return () => {
+      rendererRef.current?.setMap(null);
+      rendererRef.current = null;
+    };
+  }, []);
+
+  return null;
 }
 
 function ToggleItem({
