@@ -11,6 +11,7 @@ import {
 } from "../lib/postos";
 import { BotaoFavorito } from "./BotaoFavorito";
 import { SecaoAvaliacoes } from "./SecaoAvaliacoes";
+import { SecaoPrecos } from "./SecaoPrecos";
 import { AnelNota } from "./AnelNota";
 import { buscarIdsPatrocinados } from "../lib/patrocinios";
 
@@ -171,6 +172,8 @@ export function FichaPosto({
           </>
         )}
       </View>
+
+      <SecaoPrecos postoId={posto.id} />
 
       {(posto.latitude != null && posto.longitude != null) || mapsUrl ? (
         <Pressable
