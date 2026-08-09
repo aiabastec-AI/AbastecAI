@@ -7,6 +7,9 @@ import { supabase } from "./supabase";
 // erro pra fora — push é um extra (PRD: "favoritos, alertas"), nunca deve
 // travar login por causa disso.
 export async function registrarPushToken(usuarioId: string): Promise<void> {
+  // expo-notifications não roda na web (sem Web Push/VAPID configurado) — sair cedo em
+  // vez de deixar a chamada nativa falhar.
+  if (Platform.OS === "web") return;
   try {
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {

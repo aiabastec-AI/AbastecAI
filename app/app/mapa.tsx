@@ -1,0 +1,546 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import { useRouter } from "expo-router";
+import * as Location from "expo-location";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { APIProvider, Map, Marker, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
+import Constants from "expo-constants";
+import { corDaNota, corDoModo, glowDoModo, type ModoMapa, type ThemeColors } from "../src/theme";
+import { useTheme } from "../src/lib/ThemeProvider";
+import { tipografia } from "../src/typography";
+import { estiloMapaClaro, estiloMapaEscuro } from "../src/lib/googleMapStyle";
+import { criarIconePin } from "../src/lib/pinSvg";
+import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
+import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
+import { useFiltros } from "../src/lib/filtros";
+import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
+import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
+import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
+
+// Versão web da tela do mapa (app/index.tsx é a versão nativa, com react-native-maps —
+// bibliotecas de mapa diferentes por plataforma, sem equivalente 1:1, então em vez de uma
+// abstração forçada por cima das duas, essa tela reaproveita toda a camada de dados/tema
+// (tudo abaixo já é platform-agnostic) e só a renderização do mapa em si é própria daqui.
+// Sem clustering nessa primeira versão web (a lib teria que ser outra, @googlemaps/markerclusterer,
+// escopo futuro — desktop tem mouse+scroll, o problema de "pins empilhados" é bem menor que no touch).
+const CENTRO_INICIAL_LAT = -23.5505;
+const CENTRO_INICIAL_LNG = -46.6333;
+const RAIO_BUSCA_M = 15000;
+
+const GOOGLE_MAPS_WEB_API_KEY = Constants.expoConfig?.extra?.googleMapsWebApiKey as string | undefined;
+
+type ItemMapa = {
+  id: string;
+  tipo: "posto" | "recarga";
+  cor: string;
+  patrocinado: boolean;
+  latitude: number;
+  longitude: number;
+};
+
+export default function MapaWebScreen() {
+  const router = useRouter();
+  const { colors, modo: modoTema } = useTheme();
+  const styles = useMemo(() => criarEstilos(colors), [colors]);
+  const [modo, setModo] = useState<ModoMapa>("ambos");
+  const [postos, setPostos] = useState<PostoProximo[]>([]);
+  const [pontosRecarga, setPontosRecarga] = useState<PontoRecargaProximo[]>([]);
+  const [patrocinados, setPatrocinados] = useState<Set<string>>(new Set());
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const { notaMinima, conectoresAtivos } = useFiltros();
+  const centroAtualRef = useRef({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
+  const [centroMapa, setCentroMapa] = useState({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
+  const [zoomMapa, setZoomMapa] = useState(12);
+
+  const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
+  const [permissaoNegada, setPermissaoNegada] = useState(false);
+  const [cidadeDigitada, setCidadeDigitada] = useState("");
+  const [buscandoCidade, setBuscandoCidade] = useState(false);
+  const [erroCidade, setErroCidade] = useState<string | null>(null);
+
+  const carregarDados = useCallback(
+    async (lat: number, lng: number) => {
+      centroAtualRef.current = { lat, lng };
+      setCarregando(true);
+      setErro(null);
+      try {
+        const [postosResultado, recargaResultado] = await Promise.all([
+          buscarPostosProximos(lat, lng, RAIO_BUSCA_M, notaMinima),
+          buscarPontosRecargaProximos(lat, lng, RAIO_BUSCA_M, conectoresAtivos),
+        ]);
+        setPostos(postosResultado);
+        setPontosRecarga(recargaResultado);
+        buscarIdsPatrocinados(
+          postosResultado.map((p) => p.id),
+          recargaResultado.map((p) => p.id)
+        )
+          .then(setPatrocinados)
+          .catch(() => {});
+      } catch (e) {
+        const mensagem = (e as { message?: string })?.message || "Falha ao carregar dados do mapa.";
+        console.error("Erro ao carregar dados do mapa:", e);
+        setErro(mensagem);
+      } finally {
+        setCarregando(false);
+      }
+    },
+    [notaMinima, conectoresAtivos]
+  );
+
+  useEffect(() => {
+    carregarDados(centroAtualRef.current.lat, centroAtualRef.current.lng);
+  }, [carregarDados]);
+
+  function irParaCoordenada(lat: number, lng: number, zoom: number) {
+    setCentroMapa({ lat, lng });
+    setZoomMapa(zoom);
+    carregarDados(lat, lng);
+  }
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === Location.PermissionStatus.GRANTED) {
+        try {
+          const posicao = await Location.getCurrentPositionAsync({});
+          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+        } catch {
+          // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
+        }
+      } else {
+        setMostrarOnboarding(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function irParaMinhaLocalizacao() {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") return;
+    const posicao = await Location.getCurrentPositionAsync({});
+    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+  }
+
+  async function aoPermitirLocalizacaoOnboarding() {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      setPermissaoNegada(true);
+      return;
+    }
+    setMostrarOnboarding(false);
+    const posicao = await Location.getCurrentPositionAsync({});
+    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+  }
+
+  async function aoBuscarCidadeOnboarding() {
+    const termo = cidadeDigitada.trim();
+    if (!termo) return;
+    setBuscandoCidade(true);
+    setErroCidade(null);
+    try {
+      const resultado = await buscarCoordenadasPorCidade(termo);
+      if (!resultado) {
+        setErroCidade(`Não encontrei "${termo}".`);
+        return;
+      }
+      setMostrarOnboarding(false);
+      irParaCoordenada(resultado.lat, resultado.lng, 12);
+    } catch (e) {
+      const mensagem = (e as { message?: string })?.message || "Falha ao buscar cidade.";
+      setErroCidade(mensagem);
+    } finally {
+      setBuscandoCidade(false);
+    }
+  }
+
+  function aoCameraMudar(evento: MapCameraChangedEvent) {
+    const { center } = evento.detail;
+    carregarDados(center.lat, center.lng);
+  }
+
+  const mostrarCombustivel = modo === "combustivel" || modo === "ambos";
+  const mostrarEletrico = modo === "eletrico" || modo === "ambos";
+
+  const itensMapa = useMemo(() => {
+    const itens: ItemMapa[] = [];
+    if (mostrarCombustivel) {
+      for (const p of postos) {
+        itens.push({
+          id: p.id,
+          tipo: "posto",
+          cor: corDaNota(p.nota_anp, colors),
+          patrocinado: patrocinados.has(p.id),
+          latitude: p.latitude,
+          longitude: p.longitude,
+        });
+      }
+    }
+    if (mostrarEletrico) {
+      for (const p of pontosRecarga) {
+        itens.push({
+          id: p.id,
+          tipo: "recarga",
+          cor: colors.eletrico,
+          patrocinado: patrocinados.has(p.id),
+          latitude: p.latitude,
+          longitude: p.longitude,
+        });
+      }
+    }
+    return itens;
+  }, [postos, pontosRecarga, patrocinados, colors, mostrarCombustivel, mostrarEletrico]);
+
+  const resultadosProximos = useMemo(() => {
+    const itens: ItemProximo[] = [
+      ...(mostrarCombustivel ? postos.map((dado): ItemProximo => ({ tipo: "posto", dado })) : []),
+      ...(mostrarEletrico
+        ? pontosRecarga.map((dado): ItemProximo => ({ tipo: "recarga", dado }))
+        : []),
+    ];
+    return itens.sort((a, b) => a.dado.distancia_m - b.dado.distancia_m).slice(0, 20);
+  }, [postos, pontosRecarga, mostrarCombustivel, mostrarEletrico]);
+
+  if (!GOOGLE_MAPS_WEB_API_KEY) {
+    return (
+      <View style={[styles.container, styles.centralizado]}>
+        <Text style={styles.erroConfigTexto}>
+          Google Maps não configurado — verifique GOOGLE_MAPS_WEB_API_KEY em .env.local.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <APIProvider apiKey={GOOGLE_MAPS_WEB_API_KEY}>
+        <Map
+          style={styles.map}
+          defaultCenter={{ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG }}
+          center={centroMapa}
+          zoom={zoomMapa}
+          onCenterChanged={() => {}}
+          onCameraChanged={aoCameraMudar}
+          onZoomChanged={(e) => setZoomMapa(e.detail.zoom)}
+          styles={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
+          disableDefaultUI={false}
+          fullscreenControl={false}
+          streetViewControl={false}
+        >
+          {itensMapa.map((item) => (
+            <Marker
+              key={`${item.tipo}-${item.id}`}
+              position={{ lat: item.latitude, lng: item.longitude }}
+              icon={criarIconePin(item.cor, item.patrocinado)}
+              onClick={() =>
+                router.push(item.tipo === "posto" ? `/posto/${item.id}` : `/recarga/${item.id}`)
+              }
+            />
+          ))}
+        </Map>
+      </APIProvider>
+
+      <View style={styles.topbar}>
+        <View style={styles.toggle}>
+          <ToggleItem
+            icone="gas-station"
+            label="Combustível"
+            ativo={modo === "combustivel"}
+            corFundo={colors.combustivel}
+            corIcone={modo === "combustivel" ? colors.background : colors.textSecondary}
+            glow={colors.glowCombustivel}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("combustivel")}
+          />
+          <ToggleItem
+            icone="lightning-bolt"
+            label="Elétrico"
+            ativo={modo === "eletrico"}
+            corFundo={colors.eletrico}
+            corIcone={modo === "eletrico" ? colors.background : colors.textSecondary}
+            glow={colors.glowEletrico}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("eletrico")}
+          />
+          <ToggleItem
+            icone="map"
+            label="Ambos"
+            ativo={modo === "ambos"}
+            corFundo={colors.textPrimary}
+            corIcone={modo === "ambos" ? colors.background : colors.textSecondary}
+            estiloItem={styles.toggleItem}
+            onPress={() => setModo("ambos")}
+          />
+        </View>
+
+        <View style={styles.acoes}>
+          <Pressable style={styles.botaoIcone} onPress={() => router.push("/busca")}>
+            <Text style={styles.botaoIconeTexto}>Buscar</Text>
+          </Pressable>
+          <Pressable style={styles.botaoIcone} onPress={() => router.push("/filtros")}>
+            <Text style={styles.botaoIconeTexto}>Filtros</Text>
+          </Pressable>
+        </View>
+
+        {carregando && (
+          <View style={styles.statusBadge}>
+            <ActivityIndicator size="small" color={colors.textPrimary} />
+            <Text style={styles.statusTexto}>Carregando pontos próximos…</Text>
+          </View>
+        )}
+        {erro && !carregando && (
+          <View style={[styles.statusBadge, styles.statusBadgeErro]}>
+            <Text style={styles.statusTexto}>{erro}</Text>
+          </View>
+        )}
+      </View>
+
+      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+        <FlatList
+          style={styles.listaProximos}
+          contentContainerStyle={styles.listaProximosConteudo}
+          data={resultadosProximos}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => `${item.tipo}-${item.dado.id}`}
+          renderItem={({ item }) => (
+            <CardResultadoProximo
+              item={item}
+              colors={colors}
+              patrocinado={patrocinados.has(item.dado.id)}
+              onPress={() =>
+                router.push(item.tipo === "posto" ? `/posto/${item.dado.id}` : `/recarga/${item.dado.id}`)
+              }
+            />
+          )}
+        />
+      )}
+
+      <Pressable
+        style={[
+          styles.fab,
+          { borderColor: corDoModo(modo, colors) },
+          glowDoModo(modo, colors) ? { boxShadow: glowDoModo(modo, colors) } : null,
+        ]}
+        onPress={irParaMinhaLocalizacao}
+      >
+        <Text style={styles.fabTexto}>📍</Text>
+      </Pressable>
+
+      {mostrarOnboarding && (
+        <View style={styles.onboardingOverlay}>
+          <View style={styles.onboardingCard}>
+            <Text style={styles.onboardingTitulo}>Onde você está?</Text>
+            <Text style={styles.onboardingTexto}>
+              Usamos sua localização pra mostrar postos e pontos de recarga por perto.
+            </Text>
+
+            <Pressable style={styles.botaoPrimario} onPress={aoPermitirLocalizacaoOnboarding}>
+              <Text style={styles.botaoPrimarioTexto}>Permitir localização</Text>
+            </Pressable>
+            {permissaoNegada && (
+              <Text style={styles.onboardingAviso}>Permissão negada — digite sua cidade abaixo.</Text>
+            )}
+
+            <View style={styles.onboardingDivisor}>
+              <View style={styles.onboardingLinha} />
+              <Text style={styles.onboardingOu}>ou</Text>
+              <View style={styles.onboardingLinha} />
+            </View>
+
+            <TextInput
+              style={styles.onboardingInput}
+              placeholder="Digite sua cidade"
+              placeholderTextColor={colors.textSecondary}
+              value={cidadeDigitada}
+              onChangeText={setCidadeDigitada}
+              onSubmitEditing={aoBuscarCidadeOnboarding}
+              returnKeyType="search"
+            />
+            {buscandoCidade && <ActivityIndicator color={colors.textPrimary} />}
+            {erroCidade && !buscandoCidade && (
+              <Text style={styles.onboardingAviso}>{erroCidade}</Text>
+            )}
+
+            <Pressable style={styles.botaoSecundario} onPress={() => setMostrarOnboarding(false)}>
+              <Text style={styles.botaoSecundarioTexto}>Agora não</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ToggleItem({
+  icone,
+  label,
+  ativo,
+  corFundo,
+  corIcone,
+  glow,
+  estiloItem,
+  onPress,
+}: {
+  icone: ComponentProps<typeof MaterialCommunityIcons>["name"];
+  label: string;
+  ativo: boolean;
+  corFundo: string;
+  corIcone: string;
+  glow?: string;
+  estiloItem: StyleProp<ViewStyle>;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      style={[
+        estiloItem,
+        ativo && { backgroundColor: corFundo },
+        ativo && glow ? { boxShadow: glow } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
+    </Pressable>
+  );
+}
+
+function criarEstilos(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centralizado: { alignItems: "center", justifyContent: "center", padding: 24 },
+    erroConfigTexto: { color: colors.notaBaixa, textAlign: "center" },
+    map: { flex: 1, width: "100%", height: "100%" },
+    topbar: {
+      position: "absolute",
+      top: 20,
+      left: 16,
+      right: 16,
+      maxWidth: 480,
+      gap: 10,
+    },
+    toggle: {
+      flexDirection: "row",
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 20,
+      padding: 4,
+      gap: 4,
+    },
+    toggleItem: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 16,
+      alignItems: "center",
+    },
+    acoes: { flexDirection: "row", gap: 10 },
+    botaoIcone: {
+      flex: 1,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 14,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    botaoIconeTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+    statusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      alignSelf: "flex-start",
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    statusBadgeErro: { borderWidth: 1, borderColor: colors.notaBaixa },
+    statusTexto: { color: colors.textSecondary, fontSize: 12 },
+    fab: {
+      position: "absolute",
+      right: 16,
+      bottom: 32,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    fabTexto: { fontSize: 22 },
+    listaProximos: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 24,
+    },
+    listaProximosConteudo: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    onboardingOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background + "D9",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+    },
+    onboardingCard: {
+      width: "100%",
+      maxWidth: 360,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: 20,
+      padding: 24,
+      gap: 12,
+    },
+    onboardingTitulo: { ...tipografia.headlineMd, color: colors.textPrimary },
+    onboardingTexto: { ...tipografia.bodySm, color: colors.textSecondary },
+    onboardingAviso: { color: colors.notaBaixa, fontSize: 12 },
+    onboardingDivisor: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 2 },
+    onboardingLinha: { flex: 1, height: 1, backgroundColor: colors.border },
+    onboardingOu: { color: colors.textSecondary, fontSize: 12 },
+    onboardingInput: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.textPrimary,
+      fontSize: 15,
+    },
+    botaoPrimario: {
+      backgroundColor: colors.textPrimary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
+    botaoSecundario: {
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  });
+}
