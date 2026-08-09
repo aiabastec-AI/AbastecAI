@@ -225,6 +225,13 @@ export default function MapaWebScreen() {
   function aoCameraMudar(evento: MapCameraChangedEvent) {
     const { center, zoom } = evento.detail;
     zoomAtualRef.current = zoom;
+    // `center`/`zoom` do <Map> são props controladas (precisam pra `irParaCoordenada`
+    // conseguir recentralizar o mapa programaticamente). Sem sincronizar de volta aqui,
+    // qualquer re-render depois de um arrastar do usuário (ex.: carregarDados terminando)
+    // fazia o Google Maps "voltar" pro centro antigo — na prática, o mapa parecia não
+    // deixar arrastar pra lugar nenhum.
+    setCentroMapa({ lat: center.lat, lng: center.lng });
+    setZoomMapa(zoom);
     carregarDados(center.lat, center.lng);
   }
 
@@ -384,7 +391,7 @@ export default function MapaWebScreen() {
         </View>
       </View>
 
-      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+      {!mostrarOnboarding && selecionado && resultadosProximos.length > 0 && (
         <FlatList
           style={styles.listaProximos}
           contentContainerStyle={styles.listaProximosConteudo}
