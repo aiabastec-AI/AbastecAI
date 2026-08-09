@@ -1,8 +1,12 @@
 // Config dinâmica (em vez de app.json estático) porque precisamos ler
-// segredos de build (token de download do Mapbox) do .env.local da raiz
-// do monorepo, sem nunca embutir esse segredo no bundle JS do cliente.
+// segredos de build do .env.local da raiz do monorepo, sem nunca embutir
+// esse segredo no bundle JS do cliente.
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "..", ".env.local") });
+// Fallback pra deploys "achatados" (ex.: upload direto pra Vercel de só a pasta
+// app/, sem a estrutura de monorepo acima) — só roda se o arquivo existir, não
+// atrapalha o dev local (que já carregou tudo da linha acima).
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 
 module.exports = {
   expo: {

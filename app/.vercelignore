@@ -1,0 +1,13 @@
+node_modules
+.expo
+dist
+web-build
+.kotlin
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.tsbuildinfo
+/ios
+/android
