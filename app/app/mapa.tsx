@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { useAuth } from "../src/lib/auth";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { APIProvider, Map, Marker, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import Constants from "expo-constants";
@@ -83,7 +84,6 @@ type ItemMapa = {
 };
 
 export default function MapaWebScreen() {
-  const router = useRouter();
   const { colors, modo: modoTema } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [modo, setModo] = useState<ModoMapa>("ambos");
@@ -101,7 +101,9 @@ export default function MapaWebScreen() {
   const [selecionado, setSelecionado] = useState<{ tipo: "posto" | "recarga"; id: string } | null>(
     null
   );
-  const [mostrarBuscaFiltros, setMostrarBuscaFiltros] = useState(false);
+  // Um só painel lateral esquerdo por vez (busca+filtros ou configurações) — nunca os dois
+  // juntos, então um estado com as duas opções em vez de dois booleanos independentes.
+  const [painelEsquerdo, setPainelEsquerdo] = useState<"busca" | "config" | null>(null);
 
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [permissaoNegada, setPermissaoNegada] = useState(false);
@@ -292,7 +294,7 @@ export default function MapaWebScreen() {
           onCameraChanged={aoCameraMudar}
           onClick={() => {
             setSelecionado(null);
-            setMostrarBuscaFiltros(false);
+            setPainelEsquerdo(null);
           }}
           onZoomChanged={(e) => {
             zoomAtualRef.current = e.detail.zoom;
@@ -317,18 +319,6 @@ export default function MapaWebScreen() {
 
       <View style={styles.topbarWrapper}>
         <View style={styles.topbar}>
-          <View style={styles.appbar}>
-            <Pressable style={styles.appbarBotao} onPress={() => router.push("/config")}>
-              <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
-            </Pressable>
-            <Pressable
-              style={styles.appbarBotao}
-              onPress={() => setMostrarBuscaFiltros((v) => !v)}
-            >
-              <MaterialCommunityIcons name="tune-variant" size={26} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-
           <View style={styles.toggle}>
             <ToggleItem
               icone="gas-station"
@@ -359,13 +349,26 @@ export default function MapaWebScreen() {
               estiloItem={styles.toggleItem}
               onPress={() => setModo("ambos")}
             />
+            <View style={styles.toggleDivisor} />
+            <ToggleItem
+              icone="magnify"
+              ativo={painelEsquerdo === "busca"}
+              corFundo={colors.textPrimary}
+              corIcone={painelEsquerdo === "busca" ? colors.background : colors.textSecondary}
+              estiloItem={styles.toggleItemIcone}
+              onPress={() => setPainelEsquerdo((p) => (p === "busca" ? null : "busca"))}
+              accessibilityLabel="Buscar"
+            />
+            <ToggleItem
+              icone="cog-outline"
+              ativo={painelEsquerdo === "config"}
+              corFundo={colors.textPrimary}
+              corIcone={painelEsquerdo === "config" ? colors.background : colors.textSecondary}
+              estiloItem={styles.toggleItemIcone}
+              onPress={() => setPainelEsquerdo((p) => (p === "config" ? null : "config"))}
+              accessibilityLabel="Configurações"
+            />
           </View>
-
-          <Pressable style={styles.buscaBarra} onPress={() => setMostrarBuscaFiltros(true)}>
-            <MaterialCommunityIcons name="magnify" size={30} color={colors.textSecondary} />
-            <Text style={styles.buscaPlaceholder}>Buscar postos ou locais...</Text>
-            <MaterialCommunityIcons name="microphone-outline" size={24} color={colors.textSecondary} />
-          </Pressable>
 
           {carregando && (
             <View style={styles.statusBadge}>
@@ -475,12 +478,16 @@ export default function MapaWebScreen() {
         </View>
       )}
 
-      {mostrarBuscaFiltros && (
+      {painelEsquerdo === "busca" && (
         <PainelBuscaFiltros
           colors={colors}
-          aoFechar={() => setMostrarBuscaFiltros(false)}
+          aoFechar={() => setPainelEsquerdo(null)}
           aoSelecionar={(item) => setSelecionado(item)}
         />
+      )}
+
+      {painelEsquerdo === "config" && (
+        <PainelConfig colors={colors} aoFechar={() => setPainelEsquerdo(null)} />
       )}
     </View>
   );
@@ -666,6 +673,95 @@ function PainelBuscaFiltros({
   );
 }
 
+function PainelConfig({ colors, aoFechar }: { colors: ThemeColors; aoFechar: () => void }) {
+  const router = useRouter();
+  const { session, usuario, sair } = useAuth();
+  const styles = useMemo(() => criarEstilosPainelBusca(colors), [colors]);
+  const stylesConfig = useMemo(() => criarEstilosPainelConfig(colors), [colors]);
+
+  return (
+    <View style={styles.painel}>
+      <View style={styles.topo}>
+        <Text style={stylesConfig.titulo}>Configurações</Text>
+        <Pressable
+          style={styles.fechar}
+          onPress={aoFechar}
+          accessibilityLabel="Fechar"
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="close" size={18} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={stylesConfig.conteudo}>
+        <View style={stylesConfig.contaCard}>
+          {session ? (
+            <>
+              <Text style={stylesConfig.texto}>
+                Logado como {usuario?.nome ? `${usuario.nome} — ` : ""}
+                {session.user.email}
+              </Text>
+              <Pressable style={stylesConfig.botaoPrimario} onPress={() => router.push("/favoritos")}>
+                <Text style={stylesConfig.botaoPrimarioTexto}>Ver favoritos</Text>
+              </Pressable>
+              <Pressable style={stylesConfig.botaoSecundario} onPress={sair}>
+                <Text style={stylesConfig.botaoSecundarioTexto}>Sair</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={stylesConfig.texto}>Você não está logado — login é opcional.</Text>
+              <Pressable style={stylesConfig.botaoPrimario} onPress={() => router.push("/login")}>
+                <Text style={stylesConfig.botaoPrimarioTexto}>Entrar ou criar conta</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        <Text style={stylesConfig.texto}>
+          Dados de postos: ANP (Agência Nacional do Petróleo).{"\n"}
+          Dados de recarga: Open Charge Map.
+        </Text>
+        <Text style={stylesConfig.texto}>
+          O AbastecAI é um app independente — não tem vínculo oficial com a ANP.
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+function criarEstilosPainelConfig(colors: ThemeColors) {
+  return StyleSheet.create({
+    conteudo: { padding: 20, paddingTop: 4, gap: 18 },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 17, flex: 1 },
+    texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
+    contaCard: {
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 16,
+      padding: 18,
+      gap: 12,
+    },
+    botaoPrimario: {
+      backgroundColor: colors.eletrico,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      boxShadow: colors.glowEletrico,
+    },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+    botaoSecundario: {
+      borderRadius: 14,
+      paddingVertical: 12,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  });
+}
+
 function criarEstilosPainelBusca(colors: ThemeColors) {
   return StyleSheet.create({
     painel: {
@@ -755,20 +851,22 @@ function ToggleItem({
   glow,
   estiloItem,
   onPress,
+  accessibilityLabel,
 }: {
   icone: ComponentProps<typeof MaterialCommunityIcons>["name"];
-  label: string;
+  label?: string;
   ativo: boolean;
   corFundo: string;
   corIcone: string;
   glow?: string;
   estiloItem: StyleProp<ViewStyle>;
   onPress: () => void;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       style={[
         estiloItem,
@@ -777,7 +875,9 @@ function ToggleItem({
       ]}
     >
       <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
-      <Text style={[stylesToggle.label, { color: ativo ? corIcone : "#BACAC6" }]}>{label}</Text>
+      {label && (
+        <Text style={[stylesToggle.label, { color: ativo ? corIcone : "#BACAC6" }]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -804,21 +904,8 @@ function criarEstilos(colors: ThemeColors) {
     },
     topbar: {
       width: "100%",
-      maxWidth: 480,
+      maxWidth: 560,
       gap: 12,
-    },
-    appbar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 2,
-    },
-    appbarBotao: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: "center",
-      justifyContent: "center",
     },
     toggle: {
       flexDirection: "row",
@@ -838,18 +925,19 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "center",
     },
-    buscaBarra: {
-      flexDirection: "row",
+    toggleItemIcone: {
+      width: 44,
+      paddingVertical: 10,
+      borderRadius: 16,
       alignItems: "center",
-      gap: 10,
-      backgroundColor: colors.surfaceGlass,
-      borderWidth: 1,
-      borderColor: colors.surfaceGlassBorder,
-      borderRadius: 18,
-      paddingHorizontal: 18,
-      paddingVertical: 16,
+      justifyContent: "center",
     },
-    buscaPlaceholder: { flex: 1, color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 17 },
+    toggleDivisor: {
+      width: 1,
+      alignSelf: "stretch",
+      backgroundColor: colors.surfaceGlassBorder,
+      marginVertical: 4,
+    },
     statusBadge: {
       flexDirection: "row",
       alignItems: "center",
