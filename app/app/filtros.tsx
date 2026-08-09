@@ -10,7 +10,9 @@ import { PillToggle } from "../src/components/PillToggle";
 
 // Precisa bater com os valores de ConnectionType.Title que a Open Charge Map devolve
 // (ver supabase/functions/sync-ocm) — senão o filtro não casa com nada no banco.
-const CONECTORES = ["Type 2 (Socket Only)", "CCS (Type 2)", "CHAdeMO"];
+// Exportada porque o painel de busca+filtros do mapa web (app/mapa.tsx) reaproveita a
+// mesma lista, em vez de navegar pra essa tela cheia (que só faz sentido no nativo).
+export const CONECTORES = ["Type 2 (Socket Only)", "CCS (Type 2)", "CHAdeMO"];
 
 export default function Filtros() {
   const router = useRouter();

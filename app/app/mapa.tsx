@@ -21,14 +21,33 @@ import { useTheme } from "../src/lib/ThemeProvider";
 import { tipografia } from "../src/typography";
 import { estiloMapaClaro, estiloMapaEscuro } from "../src/lib/googleMapStyle";
 import { criarIconePin } from "../src/lib/pinSvg";
-import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
-import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
+import {
+  buscarPostosProximos,
+  buscarPostosPorTexto,
+  type PostoProximo,
+  type PostoResultadoBusca,
+} from "../src/lib/postos";
+import {
+  buscarPontosRecargaProximos,
+  buscarPontosRecargaPorTexto,
+  type PontoRecargaProximo,
+  type PontoRecargaResultadoBusca,
+} from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { FichaPosto } from "../src/components/FichaPosto";
 import { FichaRecarga } from "../src/components/FichaRecarga";
+import { PillToggle } from "../src/components/PillToggle";
+import { CONECTORES } from "./filtros";
+
+const TERMO_MINIMO_BUSCA = 2;
+const DEBOUNCE_BUSCA_MS = 350;
+
+type ItemResultadoBusca =
+  | { tipo: "posto"; dado: PostoResultadoBusca }
+  | { tipo: "recarga"; dado: PontoRecargaResultadoBusca };
 
 // Versão web da tela do mapa (app/index.tsx é a versão nativa, com react-native-maps —
 // bibliotecas de mapa diferentes por plataforma, sem equivalente 1:1, então em vez de uma
@@ -57,6 +76,7 @@ type ItemMapa = {
   id: string;
   tipo: "posto" | "recarga";
   cor: string;
+  texto?: string;
   patrocinado: boolean;
   latitude: number;
   longitude: number;
@@ -81,6 +101,7 @@ export default function MapaWebScreen() {
   const [selecionado, setSelecionado] = useState<{ tipo: "posto" | "recarga"; id: string } | null>(
     null
   );
+  const [mostrarBuscaFiltros, setMostrarBuscaFiltros] = useState(false);
 
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [permissaoNegada, setPermissaoNegada] = useState(false);
@@ -216,6 +237,7 @@ export default function MapaWebScreen() {
           id: p.id,
           tipo: "posto",
           cor: corDaNota(p.nota_anp, colors),
+          texto: p.nota_anp != null ? p.nota_anp.toFixed(1) : undefined,
           patrocinado: patrocinados.has(p.id),
           latitude: p.latitude,
           longitude: p.longitude,
@@ -228,6 +250,7 @@ export default function MapaWebScreen() {
           id: p.id,
           tipo: "recarga",
           cor: colors.eletrico,
+          texto: "⚡",
           patrocinado: patrocinados.has(p.id),
           latitude: p.latitude,
           longitude: p.longitude,
@@ -267,7 +290,10 @@ export default function MapaWebScreen() {
           zoom={zoomMapa}
           onCenterChanged={() => {}}
           onCameraChanged={aoCameraMudar}
-          onClick={() => setSelecionado(null)}
+          onClick={() => {
+            setSelecionado(null);
+            setMostrarBuscaFiltros(false);
+          }}
           onZoomChanged={(e) => {
             zoomAtualRef.current = e.detail.zoom;
             setZoomMapa(e.detail.zoom);
@@ -276,78 +302,83 @@ export default function MapaWebScreen() {
           disableDefaultUI={false}
           fullscreenControl={false}
           streetViewControl={false}
+          gestureHandling="greedy"
         >
           {itensMapa.map((item) => (
             <Marker
               key={`${item.tipo}-${item.id}`}
               position={{ lat: item.latitude, lng: item.longitude }}
-              icon={criarIconePin(item.cor, item.patrocinado)}
+              icon={criarIconePin(item.cor, item.patrocinado, item.texto)}
               onClick={() => setSelecionado({ tipo: item.tipo, id: item.id })}
             />
           ))}
         </Map>
       </APIProvider>
 
-      <View style={styles.topbar}>
-        <View style={styles.appbar}>
-          <Pressable style={styles.appbarBotao} onPress={() => router.push("/config")}>
-            <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
-          </Pressable>
-          <Text style={styles.logo}>AbastecAI</Text>
-          <Pressable style={styles.appbarBotao} onPress={() => router.push("/filtros")}>
-            <MaterialCommunityIcons name="tune-variant" size={26} color={colors.textSecondary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.toggle}>
-          <ToggleItem
-            icone="gas-station"
-            label="Combustível"
-            ativo={modo === "combustivel"}
-            corFundo={colors.combustivel}
-            corIcone={modo === "combustivel" ? colors.background : colors.textSecondary}
-            glow={colors.glowCombustivel}
-            estiloItem={styles.toggleItem}
-            onPress={() => setModo("combustivel")}
-          />
-          <ToggleItem
-            icone="lightning-bolt"
-            label="Elétrico"
-            ativo={modo === "eletrico"}
-            corFundo={colors.eletrico}
-            corIcone={modo === "eletrico" ? colors.background : colors.textSecondary}
-            glow={colors.glowEletrico}
-            estiloItem={styles.toggleItem}
-            onPress={() => setModo("eletrico")}
-          />
-          <ToggleItem
-            icone="map"
-            label="Ambos"
-            ativo={modo === "ambos"}
-            corFundo={colors.textPrimary}
-            corIcone={modo === "ambos" ? colors.background : colors.textSecondary}
-            estiloItem={styles.toggleItem}
-            onPress={() => setModo("ambos")}
-          />
-        </View>
-
-        <Pressable style={styles.buscaBarra} onPress={() => router.push("/busca")}>
-          <MaterialCommunityIcons name="magnify" size={30} color={colors.textSecondary} />
-          <Text style={styles.buscaPlaceholder}>Buscar postos ou locais...</Text>
-          <MaterialCommunityIcons name="microphone-outline" size={24} color={colors.textSecondary} />
-        </Pressable>
-
-        {carregando && (
-          <View style={styles.statusBadge}>
-            <ActivityIndicator size="small" color={colors.textPrimary} />
-            <Text style={styles.statusTexto}>Carregando pontos próximos…</Text>
+      <View style={styles.topbarWrapper}>
+        <View style={styles.topbar}>
+          <View style={styles.appbar}>
+            <Pressable style={styles.appbarBotao} onPress={() => router.push("/config")}>
+              <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
+            </Pressable>
+            <Pressable
+              style={styles.appbarBotao}
+              onPress={() => setMostrarBuscaFiltros((v) => !v)}
+            >
+              <MaterialCommunityIcons name="tune-variant" size={26} color={colors.textSecondary} />
+            </Pressable>
           </View>
-        )}
-        {erro && !carregando && (
-          <View style={[styles.statusBadge, styles.statusBadgeErro]}>
-            <Text style={styles.statusTexto}>{erro}</Text>
+
+          <View style={styles.toggle}>
+            <ToggleItem
+              icone="gas-station"
+              label="Combustível"
+              ativo={modo === "combustivel"}
+              corFundo={colors.combustivel}
+              corIcone={modo === "combustivel" ? colors.background : colors.textSecondary}
+              glow={colors.glowCombustivel}
+              estiloItem={styles.toggleItem}
+              onPress={() => setModo("combustivel")}
+            />
+            <ToggleItem
+              icone="lightning-bolt"
+              label="Elétrico"
+              ativo={modo === "eletrico"}
+              corFundo={colors.eletrico}
+              corIcone={modo === "eletrico" ? colors.background : colors.textSecondary}
+              glow={colors.glowEletrico}
+              estiloItem={styles.toggleItem}
+              onPress={() => setModo("eletrico")}
+            />
+            <ToggleItem
+              icone="map"
+              label="Ambos"
+              ativo={modo === "ambos"}
+              corFundo={colors.textPrimary}
+              corIcone={modo === "ambos" ? colors.background : colors.textSecondary}
+              estiloItem={styles.toggleItem}
+              onPress={() => setModo("ambos")}
+            />
           </View>
-        )}
+
+          <Pressable style={styles.buscaBarra} onPress={() => setMostrarBuscaFiltros(true)}>
+            <MaterialCommunityIcons name="magnify" size={30} color={colors.textSecondary} />
+            <Text style={styles.buscaPlaceholder}>Buscar postos ou locais...</Text>
+            <MaterialCommunityIcons name="microphone-outline" size={24} color={colors.textSecondary} />
+          </Pressable>
+
+          {carregando && (
+            <View style={styles.statusBadge}>
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <Text style={styles.statusTexto}>Carregando pontos próximos…</Text>
+            </View>
+          )}
+          {erro && !carregando && (
+            <View style={[styles.statusBadge, styles.statusBadgeErro]}>
+              <Text style={styles.statusTexto}>{erro}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {!mostrarOnboarding && resultadosProximos.length > 0 && (
@@ -443,8 +474,276 @@ export default function MapaWebScreen() {
           </ScrollView>
         </View>
       )}
+
+      {mostrarBuscaFiltros && (
+        <PainelBuscaFiltros
+          colors={colors}
+          aoFechar={() => setMostrarBuscaFiltros(false)}
+          aoSelecionar={(item) => setSelecionado(item)}
+        />
+      )}
     </View>
   );
+}
+
+function PainelBuscaFiltros({
+  colors,
+  aoFechar,
+  aoSelecionar,
+}: {
+  colors: ThemeColors;
+  aoFechar: () => void;
+  aoSelecionar: (item: { tipo: "posto" | "recarga"; id: string }) => void;
+}) {
+  const styles = useMemo(() => criarEstilosPainelBusca(colors), [colors]);
+  const { notaMinima, setNotaMinima, conectoresAtivos, setConectoresAtivos } = useFiltros();
+  const [termo, setTermo] = useState("");
+  const [resultados, setResultados] = useState<ItemResultadoBusca[]>([]);
+  const [patrocinados, setPatrocinados] = useState<Set<string>>(new Set());
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    const termoBusca = termo.trim();
+    if (termoBusca.length < TERMO_MINIMO_BUSCA) {
+      setResultados([]);
+      setErro(null);
+      setCarregando(false);
+      return;
+    }
+
+    let cancelado = false;
+    setCarregando(true);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const [postosResultado, recargaResultado] = await Promise.all([
+          buscarPostosPorTexto(termoBusca),
+          buscarPontosRecargaPorTexto(termoBusca),
+        ]);
+        if (cancelado) return;
+        setErro(null);
+        setResultados([
+          ...postosResultado.map((dado): ItemResultadoBusca => ({ tipo: "posto", dado })),
+          ...recargaResultado.map((dado): ItemResultadoBusca => ({ tipo: "recarga", dado })),
+        ]);
+        buscarIdsPatrocinados(
+          postosResultado.map((p) => p.id),
+          recargaResultado.map((p) => p.id)
+        )
+          .then((ids) => !cancelado && setPatrocinados(ids))
+          .catch(() => {});
+      } catch (e) {
+        if (cancelado) return;
+        const mensagem = (e as { message?: string })?.message || "Falha ao buscar.";
+        setErro(mensagem);
+      } finally {
+        if (!cancelado) setCarregando(false);
+      }
+    }, DEBOUNCE_BUSCA_MS);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timeoutId);
+    };
+  }, [termo]);
+
+  function alternarConector(conector: string) {
+    setConectoresAtivos(
+      conectoresAtivos.includes(conector)
+        ? conectoresAtivos.filter((c) => c !== conector)
+        : [...conectoresAtivos, conector]
+    );
+  }
+
+  const termoValido = termo.trim().length >= TERMO_MINIMO_BUSCA;
+
+  return (
+    <View style={styles.painel}>
+      <View style={styles.topo}>
+        <View style={styles.inputWrapper}>
+          <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Buscar postos ou locais..."
+            placeholderTextColor={colors.textSecondary}
+            value={termo}
+            onChangeText={setTermo}
+            autoFocus
+          />
+        </View>
+        <Pressable
+          style={styles.fechar}
+          onPress={aoFechar}
+          accessibilityLabel="Fechar"
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="close" size={18} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.conteudo}>
+        <View style={styles.secao}>
+          <Text style={styles.rotulo}>Combustível — nota mínima</Text>
+          <View style={styles.notaLinha}>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <PillToggle
+                key={n}
+                ativo={notaMinima === n}
+                cor={corDaNota(n, colors)}
+                onPress={() => setNotaMinima(n)}
+                accessibilityLabel={`Nota mínima ${n}`}
+                style={styles.notaChip}
+              >
+                <Text style={[styles.notaChipTexto, notaMinima === n && { color: corDaNota(n, colors) }]}>
+                  {n}
+                </Text>
+              </PillToggle>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.secao}>
+          <Text style={styles.rotulo}>Elétrico — tipo de conector</Text>
+          <View style={styles.chipsLinha}>
+            {CONECTORES.map((conector) => {
+              const ativo = conectoresAtivos.includes(conector);
+              return (
+                <PillToggle
+                  key={conector}
+                  ativo={ativo}
+                  cor={colors.eletrico}
+                  onPress={() => alternarConector(conector)}
+                  accessibilityLabel={conector}
+                >
+                  <Text style={[styles.chipTexto, ativo && { color: colors.eletrico }]}>{conector}</Text>
+                </PillToggle>
+              );
+            })}
+          </View>
+        </View>
+
+        {termoValido && (
+          <View style={styles.secao}>
+            <Text style={styles.rotulo}>Resultados</Text>
+            {carregando && (
+              <View style={styles.status}>
+                <ActivityIndicator size="small" color={colors.textPrimary} />
+                <Text style={styles.textoSecundario}>Buscando…</Text>
+              </View>
+            )}
+            {erro && !carregando && <Text style={[styles.textoSecundario, styles.erro]}>{erro}</Text>}
+            {!carregando && !erro && resultados.length === 0 && (
+              <Text style={styles.textoSecundario}>Nenhum resultado pra "{termo.trim()}".</Text>
+            )}
+            {resultados.map((item) => {
+              const corItem =
+                item.tipo === "posto" ? corDaNota(item.dado.nota_anp, colors) : colors.eletrico;
+              return (
+                <Pressable
+                  key={`${item.tipo}-${item.dado.id}`}
+                  style={[styles.resultadoItem, { borderColor: corItem + "40" }]}
+                  onPress={() => aoSelecionar({ tipo: item.tipo, id: item.dado.id })}
+                >
+                  <View style={[styles.resultadoMarcador, { backgroundColor: corItem }]} />
+                  <View style={styles.resultadoTextos}>
+                    <Text style={styles.resultadoNome} numberOfLines={1}>
+                      {patrocinados.has(item.dado.id) ? "★ " : ""}
+                      {item.dado.nome}
+                    </Text>
+                    <Text style={styles.resultadoLocal} numberOfLines={1}>
+                      {[item.dado.cidade, item.dado.uf].filter(Boolean).join(" - ") ||
+                        "Localização não informada"}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+function criarEstilosPainelBusca(colors: ThemeColors) {
+  return StyleSheet.create({
+    painel: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      bottom: 0,
+      width: 380,
+      maxWidth: "100%",
+      backgroundColor: colors.background,
+      borderRightWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      boxShadow: "8px 0px 24px rgba(0, 0, 0, 0.3)",
+    },
+    topo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      padding: 12,
+    },
+    inputWrapper: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    input: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontFamily: "Inter_400Regular",
+      fontSize: 14,
+    },
+    fechar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    scroll: { flex: 1 },
+    conteudo: { padding: 20, paddingTop: 4, gap: 20 },
+    secao: { gap: 10 },
+    rotulo: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 11 },
+    notaLinha: { flexDirection: "row", gap: 8 },
+    notaChip: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
+    notaChipTexto: { color: colors.textPrimary, fontFamily: "SpaceGrotesk_600SemiBold" },
+    chipsLinha: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+    chipTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+    status: { flexDirection: "row", alignItems: "center", gap: 8 },
+    textoSecundario: { ...tipografia.bodySm, color: colors.textSecondary },
+    erro: { color: colors.notaBaixa },
+    resultadoItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 8,
+    },
+    resultadoMarcador: { width: 10, height: 10, borderRadius: 5 },
+    resultadoTextos: { flex: 1, gap: 2 },
+    resultadoNome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+    resultadoLocal: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
+  });
 }
 
 function ToggleItem({
@@ -496,11 +795,15 @@ function criarEstilos(colors: ThemeColors) {
     centralizado: { alignItems: "center", justifyContent: "center", padding: 24 },
     erroConfigTexto: { color: colors.notaBaixa, textAlign: "center" },
     map: { flex: 1, width: "100%", height: "100%" },
-    topbar: {
+    topbarWrapper: {
       position: "absolute",
       top: 20,
       left: 16,
       right: 16,
+      alignItems: "center",
+    },
+    topbar: {
+      width: "100%",
       maxWidth: 480,
       gap: 12,
     },
@@ -516,12 +819,6 @@ function criarEstilos(colors: ThemeColors) {
       borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
-    },
-    logo: {
-      fontFamily: "SpaceGrotesk_700Bold",
-      fontSize: 34,
-      lineHeight: 40,
-      color: colors.eletrico,
     },
     toggle: {
       flexDirection: "row",
