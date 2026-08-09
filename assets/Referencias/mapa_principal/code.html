@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AbastecAI - Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed-variant": "#673d00",
+                      "on-error": "#690005",
+                      "outline-variant": "#3b4a47",
+                      "surface-card": "#171A1F",
+                      "on-secondary": "#542200",
+                      "inverse-surface": "#e2e2e6",
+                      "on-primary-fixed-variant": "#005047",
+                      "surface-container-high": "#282a2d",
+                      "on-background": "#e2e2e6",
+                      "primary-fixed": "#5efae4",
+                      "on-tertiary-container": "#734500",
+                      "on-surface-variant": "#bacac6",
+                      "on-surface": "#e2e2e6",
+                      "tertiary-fixed-dim": "#ffb866",
+                      "electric-cyan": "#2FD9C4",
+                      "surface-dim": "#111317",
+                      "on-primary": "#003731",
+                      "surface-variant": "#333538",
+                      "status-critical": "#FF4D4D",
+                      "fuel-amber": "#FF7A1A",
+                      "surface-container-lowest": "#0c0e11",
+                      "surface-container": "#1e2023",
+                      "surface-container-low": "#1a1c1f",
+                      "inverse-primary": "#006b5f",
+                      "secondary-fixed": "#ffdbca",
+                      "on-error-container": "#ffdad6",
+                      "secondary-fixed-dim": "#ffb68e",
+                      "error": "#ffb4ab",
+                      "surface": "#111317",
+                      "surface-tint": "#36ddc8",
+                      "error-container": "#93000a",
+                      "on-primary-fixed": "#00201c",
+                      "status-optimal": "#2ECC71",
+                      "on-secondary-container": "#491d00",
+                      "tertiary": "#ffd8af",
+                      "on-primary-container": "#005a50",
+                      "background": "#111317",
+                      "status-warning": "#F1C40F",
+                      "tertiary-fixed": "#ffddba",
+                      "on-secondary-fixed-variant": "#773300",
+                      "primary-container": "#2fd9c4",
+                      "on-tertiary": "#482900",
+                      "secondary-container": "#eb6b01",
+                      "on-tertiary-fixed": "#2b1700",
+                      "on-secondary-fixed": "#331200",
+                      "inverse-on-surface": "#2f3034",
+                      "surface-bright": "#37393d",
+                      "outline": "#859490",
+                      "primary": "#59f6e0",
+                      "secondary": "#ffb68e",
+                      "primary-fixed-dim": "#36ddc8",
+                      "tertiary-container": "#ffb358",
+                      "surface-container-highest": "#333538"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "map-edge-safe": "1.25rem",
+                      "section-padding": "1.5rem",
+                      "gutter": "1rem",
+                      "container-margin": "1rem",
+                      "component-gap": "0.75rem"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Space Grotesk"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Space Grotesk"
+                      ],
+                      "headline-md": [
+                              "Space Grotesk"
+                      ],
+                      "metric-xl": [
+                              "Space Grotesk"
+                      ],
+                      "headline-lg-mobile": [
+                              "Space Grotesk"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Space Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "metric-xl": [
+                              "40px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.04em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .map-bg {
+            background-color: #0D0F12;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(47, 217, 196, 0.05) 0%, transparent 60%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+        
+        .glow-cyan {
+            box-shadow: 0 0 15px 2px rgba(47, 217, 196, 0.3);
+        }
+        
+        .glow-amber {
+            box-shadow: 0 0 15px 2px rgba(255, 122, 26, 0.3);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-screen overflow-hidden flex flex-col relative">
+<!-- Top App Bar - Web Hidden, Mobile Visible -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter py-2 bg-background/80 backdrop-blur-md bg-surface/90 backdrop-blur-xl shadow-sm md:hidden">
+<button aria-label="menu" class="p-2 active:scale-95 transition-transform hover:bg-surface-variant/50 transition-colors rounded-full">
+<span class="material-symbols-outlined text-electric-cyan" data-weight="outline">menu</span>
+</button>
+<div class="font-display-lg text-headline-lg-mobile tracking-tighter text-electric-cyan">AbastecAI</div>
+<button aria-label="tune" class="p-2 active:scale-95 transition-transform hover:bg-surface-variant/50 transition-colors rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant" data-weight="outline">tune</span>
+</button>
+</header>
+<!-- Top App Bar - Web Visible, Mobile Hidden (Navigation Cluster) -->
+<header class="hidden md:flex fixed top-0 left-0 w-full z-50 justify-between items-center px-section-padding py-4 bg-background/80 backdrop-blur-md bg-surface/90 backdrop-blur-xl shadow-sm">
+<div class="flex items-center gap-4">
+<button aria-label="menu" class="p-2 active:scale-95 transition-transform hover:bg-surface-variant/50 transition-colors rounded-full">
+<span class="material-symbols-outlined text-electric-cyan" data-weight="outline">menu</span>
+</button>
+<div class="font-display-lg text-headline-lg tracking-tighter text-electric-cyan flex items-center gap-2">
+<img alt="AbastecAI Logo" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAg-JzBr73JIdiZytwHzQyuvl7RKLwey7y7DaKaoGL5Twf2CpkFs6yTJHhhtWfgvL4hqIofEXQQQel0WosOsDYqI4mGvxiwKsVE0-DiIHkB9eg1iOxv5R3d4Aeed1WRVjRgNypV4Y_a9NciJVgBeJCX6J1iha1bD21OWJZrgHH4BdlH4YsNbvZB8K0ZwzHQxVdAg7FG-aV-o2oCKuLz8VIswTZ1MggnLSBCTc3s5e_v461P3DJZaoQdSxCk71y0PQTQrA"/>
+                 AbastecAI
+             </div>
+</div>
+<nav class="flex gap-6 items-center">
+<a class="flex items-center gap-2 text-electric-cyan hover:bg-surface-variant/50 px-4 py-2 rounded-lg transition-colors font-headline-md" href="#">
+<span class="material-symbols-outlined" data-weight="outline">map</span>
+                 Map
+             </a>
+<a class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-variant/50 px-4 py-2 rounded-lg transition-colors font-headline-md" href="#">
+<span class="material-symbols-outlined" data-weight="outline">ev_station</span>
+                 Stations
+             </a>
+<a class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-variant/50 px-4 py-2 rounded-lg transition-colors font-headline-md" href="#">
+<span class="material-symbols-outlined" data-weight="outline">history</span>
+                 History
+             </a>
+<a class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-variant/50 px-4 py-2 rounded-lg transition-colors font-headline-md" href="#">
+<span class="material-symbols-outlined" data-weight="outline">person</span>
+                 Profile
+             </a>
+</nav>
+<button aria-label="tune" class="p-2 active:scale-95 transition-transform hover:bg-surface-variant/50 transition-colors rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant" data-weight="outline">tune</span>
+</button>
+</header>
+<!-- Main Map Canvas -->
+<main class="flex-grow relative map-bg pt-16 md:pt-24 pb-20 md:pb-0 z-0">
+<!-- Search & Context Overlay -->
+<div class="absolute top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-10 flex flex-col gap-3 mt-14 md:mt-4">
+<!-- Context Toggle -->
+<div class="flex bg-surface-card/90 backdrop-blur-md rounded-full p-1 border border-outline-variant/30 shadow-lg mx-auto w-fit">
+<button class="px-4 py-1.5 rounded-full text-sm font-semibold transition-all bg-surface-variant text-fuel-amber glow-amber">
+                    Combustível
+                </button>
+<button class="px-4 py-1.5 rounded-full text-sm font-semibold transition-all text-on-surface-variant hover:text-electric-cyan">
+                    Ambos
+                </button>
+<button class="px-4 py-1.5 rounded-full text-sm font-semibold transition-all text-on-surface-variant hover:text-electric-cyan">
+                    Elétrico
+                </button>
+</div>
+<!-- Search Bar -->
+<div class="relative w-full group">
+<div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant" data-weight="outline">search</span>
+</div>
+<input class="bg-surface-card border border-outline-variant/50 text-on-surface text-body-md rounded-xl focus:ring-electric-cyan focus:border-electric-cyan block w-full pl-11 p-3.5 shadow-lg group-hover:border-electric-cyan/50 transition-colors placeholder-on-surface-variant/50" placeholder="Search stations or locations..." type="text"/>
+<div class="absolute inset-y-0 right-0 flex items-center pr-3">
+<button class="p-1 rounded-md hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant" data-weight="outline">mic</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Map Pins (Static Simulation for Layout) -->
+<!-- Optimal Gas Station -->
+<div class="absolute top-1/3 left-1/4 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer hover:scale-110 transition-transform">
+<div class="w-11 h-11 bg-surface-card rounded-full flex items-center justify-center border-2 border-status-optimal shadow-[0_0_15px_rgba(46,204,113,0.3)] group-hover:shadow-[0_0_20px_rgba(46,204,113,0.5)]">
+<span class="font-metric-xl text-status-optimal text-lg">4.8</span>
+</div>
+<div class="w-1 h-3 bg-status-optimal mx-auto"></div>
+</div>
+<!-- Warning Gas Station -->
+<div class="absolute top-1/2 left-2/3 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer hover:scale-110 transition-transform">
+<div class="w-11 h-11 bg-surface-card rounded-full flex items-center justify-center border-2 border-status-warning shadow-[0_0_15px_rgba(241,196,15,0.3)]">
+<span class="font-metric-xl text-status-warning text-lg">3.2</span>
+</div>
+<div class="w-1 h-3 bg-status-warning mx-auto"></div>
+</div>
+<!-- Critical Gas Station -->
+<div class="absolute bottom-1/3 left-1/3 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer hover:scale-110 transition-transform">
+<div class="w-11 h-11 bg-surface-card rounded-full flex items-center justify-center border-2 border-status-critical shadow-[0_0_15px_rgba(255,77,77,0.3)]">
+<span class="font-metric-xl text-status-critical text-lg">1.5</span>
+</div>
+<div class="w-1 h-3 bg-status-critical mx-auto"></div>
+</div>
+<!-- EV Station -->
+<div class="absolute top-1/4 right-1/4 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer scale-110 transition-transform">
+<div class="w-12 h-12 bg-surface-card rounded-full flex items-center justify-center border-2 border-electric-cyan glow-cyan">
+<span class="material-symbols-outlined text-electric-cyan" data-weight="fill">bolt</span>
+</div>
+<div class="w-1 h-4 bg-electric-cyan mx-auto"></div>
+</div>
+<!-- Floating Action Buttons -->
+<div class="absolute bottom-32 md:bottom-8 right-map-edge-safe z-30 flex flex-col gap-3">
+<button class="w-12 h-12 bg-surface-card/90 backdrop-blur-md rounded-full shadow-lg border border-outline-variant/30 flex items-center justify-center text-on-surface hover:text-electric-cyan transition-colors">
+<span class="material-symbols-outlined" data-weight="outline">layers</span>
+</button>
+<button class="w-12 h-12 bg-electric-cyan rounded-full shadow-[0_0_20px_rgba(47,217,196,0.4)] flex items-center justify-center text-on-primary hover:bg-primary transition-colors">
+<span class="material-symbols-outlined" data-weight="fill">my_location</span>
+</button>
+</div>
+<!-- Quick View Cards - Horizontal Scroll -->
+<div class="absolute bottom-20 md:bottom-8 left-0 w-full z-20 px-map-edge-safe pb-4 md:px-section-padding md:w-auto md:max-w-3xl">
+<div class="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory">
+<!-- Station Card 1 (Combustion) -->
+<div class="min-w-[280px] w-[280px] bg-surface-card/95 backdrop-blur-xl border border-outline-variant/20 rounded-xl p-4 shadow-lg snap-center flex-shrink-0 cursor-pointer hover:border-fuel-amber/50 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline-md text-on-surface">Posto Ipiranga</h3>
+<p class="text-body-sm text-on-surface-variant">Av. Paulista, 1000</p>
+</div>
+<div class="text-right">
+<span class="font-metric-xl text-lg text-on-surface">1.2</span><span class="text-body-sm text-on-surface-variant"> km</span>
+</div>
+</div>
+<div class="flex justify-between items-end mt-4">
+<div class="flex items-center gap-2">
+<div class="px-2 py-1 bg-status-optimal/20 border border-status-optimal/50 rounded text-status-optimal font-label-caps text-xs">
+                                SCORE: 4.8
+                            </div>
+<span class="text-body-sm text-on-surface-variant">R$ 5.49/L</span>
+</div>
+<span class="material-symbols-outlined text-fuel-amber/30 text-3xl">local_gas_station</span>
+</div>
+</div>
+<!-- Station Card 2 (EV) -->
+<div class="min-w-[280px] w-[280px] bg-surface-card/95 backdrop-blur-xl border border-electric-cyan/50 rounded-xl p-4 shadow-[0_0_15px_rgba(47,217,196,0.15)] snap-center flex-shrink-0 cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline-md text-on-surface">Eletroposto Shell</h3>
+<p class="text-body-sm text-on-surface-variant">Shopping Cidade</p>
+</div>
+<div class="text-right">
+<span class="font-metric-xl text-lg text-electric-cyan">2.5</span><span class="text-body-sm text-on-surface-variant"> km</span>
+</div>
+</div>
+<div class="flex gap-2 mt-2">
+<div class="px-2 py-0.5 border border-outline-variant rounded-full text-xs text-on-surface-variant">CCS2</div>
+<div class="px-2 py-0.5 border border-outline-variant rounded-full text-xs text-on-surface-variant">CHAdeMO</div>
+</div>
+<div class="flex justify-between items-end mt-2">
+<div class="flex items-center gap-1 text-electric-cyan">
+<span class="material-symbols-outlined text-sm" data-weight="fill">bolt</span>
+<span class="font-bold text-sm">150 kW</span>
+</div>
+<span class="material-symbols-outlined text-electric-cyan/30 text-3xl">ev_station</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Nav Bar - Mobile Only -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_12px_rgba(0,0,0,0.5)] md:hidden bg-surface-container/95 border-t border-outline-variant/20 rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-electric-cyan bg-primary-container/20 rounded-xl p-1.5 active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-weight="fill">map</span>
+<span class="font-label-caps text-label-caps mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-1.5 hover:text-primary transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-weight="outline">ev_station</span>
+<span class="font-label-caps text-label-caps mt-1">Stations</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-1.5 hover:text-primary transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-weight="outline">history</span>
+<span class="font-label-caps text-label-caps mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-1.5 hover:text-primary transition-all active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-weight="outline">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</a>
+</nav>
+</body></html>

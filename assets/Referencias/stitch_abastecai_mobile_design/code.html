@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AbastecAI - Main Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#333538",
+                        "surface-container-lowest": "#0c0e11",
+                        "background": "#111317",
+                        "on-secondary-fixed": "#331200",
+                        "on-surface": "#e2e2e6",
+                        "surface-tint": "#36ddc8",
+                        "inverse-on-surface": "#2f3034",
+                        "primary-fixed-dim": "#36ddc8",
+                        "on-secondary": "#542200",
+                        "on-tertiary-fixed": "#2b1700",
+                        "on-tertiary": "#482900",
+                        "secondary-fixed": "#ffdbca",
+                        "status-critical": "#FF4D4D",
+                        "on-secondary-fixed-variant": "#773300",
+                        "primary": "#59f6e0",
+                        "fuel-amber": "#FF7A1A",
+                        "tertiary-container": "#ffb358",
+                        "primary-container": "#2fd9c4",
+                        "on-error": "#690005",
+                        "on-primary-container": "#005a50",
+                        "electric-cyan": "#2FD9C4",
+                        "on-surface-variant": "#bacac6",
+                        "status-optimal": "#2ECC71",
+                        "tertiary-fixed-dim": "#ffb866",
+                        "secondary-fixed-dim": "#ffb68e",
+                        "on-background": "#e2e2e6",
+                        "surface-dim": "#111317",
+                        "surface-container-low": "#1a1c1f",
+                        "status-warning": "#F1C40F",
+                        "secondary-container": "#eb6b01",
+                        "surface-container": "#1e2023",
+                        "secondary": "#ffb68e",
+                        "on-primary-fixed-variant": "#005047",
+                        "on-primary-fixed": "#00201c",
+                        "inverse-surface": "#e2e2e6",
+                        "on-error-container": "#ffdad6",
+                        "tertiary": "#ffd8af",
+                        "inverse-primary": "#006b5f",
+                        "tertiary-fixed": "#ffddba",
+                        "surface-card": "#171A1F",
+                        "surface-variant": "#333538",
+                        "error-container": "#93000a",
+                        "surface-bright": "#37393d",
+                        "error": "#ffb4ab",
+                        "outline": "#859490",
+                        "on-tertiary-container": "#734500",
+                        "surface-container-high": "#282a2d",
+                        "on-tertiary-fixed-variant": "#673d00",
+                        "surface": "#111317",
+                        "outline-variant": "#3b4a47",
+                        "on-primary": "#003731",
+                        "on-secondary-container": "#491d00",
+                        "primary-fixed": "#5efae4"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "section-padding": "1.5rem",
+                        "gutter": "1rem",
+                        "component-gap": "0.75rem",
+                        "container-margin": "1rem",
+                        "map-edge-safe": "1.25rem"
+                    },
+                    fontFamily: {
+                        "display-lg": ["Space Grotesk"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Space Grotesk"],
+                        "headline-md": ["Space Grotesk"],
+                        "headline-lg-mobile": ["Space Grotesk"],
+                        "body-sm": ["Inter"],
+                        "metric-xl": ["Space Grotesk"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["Space Grotesk"]
+                    },
+                    fontSize: {
+                        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", fontWeight: "600" }],
+                        "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "metric-xl": ["40px", { lineHeight: "40px", letterSpacing: "-0.04em", fontWeight: "700" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.1em", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glow-cyan { box-shadow: 0 0 20px rgba(47, 217, 196, 0.4); }
+        .glow-amber { box-shadow: 0 0 20px rgba(255, 122, 26, 0.4); }
+        .pulse-cyan { animation: pulseCyan 2s infinite; }
+        @keyframes pulseCyan {
+            0% { box-shadow: 0 0 0 0 rgba(47, 217, 196, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(47, 217, 196, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(47, 217, 196, 0); }
+        }
+        
+        /* Custom scrollbar for sidebar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3b4a47; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #859490; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md h-screen w-full overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-background/80 backdrop-blur-md text-electric-cyan docked full-width top-0 bg-surface/90 border-b border-outline-variant/30 shadow-sm fixed left-0 w-full z-50 flex justify-between items-center px-gutter py-2 h-[72px]">
+<!-- Left: Brand & Menu -->
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-surface-variant/50 transition-colors active:scale-95 text-on-surface-variant" id="menu-btn">
+<span class="material-symbols-outlined text-[28px]" data-icon="menu">menu</span>
+</button>
+<h1 class="font-display-lg text-headline-lg tracking-tighter text-electric-cyan">AbastecAI</h1>
+</div>
+<!-- Center: Search & Mode Toggle -->
+<div class="flex-1 flex justify-center items-center gap-6 max-w-3xl mx-4">
+<!-- Search Bar -->
+<div class="relative w-full max-w-md group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-electric-cyan transition-colors" data-icon="search">search</span>
+<input class="w-full bg-surface-card border border-outline-variant/50 rounded-full py-2.5 pl-12 pr-4 text-on-surface placeholder:text-outline focus:outline-none focus:border-electric-cyan focus:ring-1 focus:ring-electric-cyan transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]" placeholder="Search stations, addresses..." type="text"/>
+</div>
+<!-- Mode Toggle -->
+<div class="flex items-center bg-surface-container-highest rounded-full p-1 border border-outline-variant/30">
+<button class="px-4 py-1.5 rounded-full font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">FUEL</button>
+<button class="px-4 py-1.5 rounded-full font-label-caps text-label-caps bg-primary-container text-on-primary-container shadow-sm transition-colors">EV</button>
+<button class="px-4 py-1.5 rounded-full font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors">BOTH</button>
+</div>
+</div>
+<!-- Right: Actions -->
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-surface-variant/50 transition-colors active:scale-95 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-card border-2 border-outline-variant overflow-hidden ml-2 cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A macro photography style portrait of an intense, futuristic driver in a neon-lit cyber environment, dark atmospheric lighting, highly detailed." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8xePiCwAtYf1K8uhEHKaU9Pafc1bDhNuzBnR7ESUlOawSMFUh5rwzAJk9Z8RyrzAw9nh8mNeeTBxwed3N3aQhPouH3DFxYtl3vvv_ax-57G7omnd4-f7i1tJsslLKIncXm908B0H-omTztKBWxLHh3qTu-W4jnNWqaNx5ZKjdWR2r1oGfGZZPv6Yb-Z0hQcBW9HMnUPJCpglZkeCjvKHoAgLwokRXGpqom1UyoRk5RoSc40HysZLr"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<div class="flex-1 flex mt-[72px] relative w-full h-[calc(100vh-72px)] overflow-hidden">
+<!-- NavigationDrawer (Hidden by default, overlays sidebar) -->
+<div class="bg-surface-dim h-full w-80 rounded-r-xl border-r border-outline-variant/40 shadow-2xl fixed inset-y-0 left-0 z-[60] transform -translate-x-full ease-in-out duration-300 flex flex-col pt-[80px]" id="nav-drawer">
+<div class="p-6 border-b border-outline-variant/20 mb-4">
+<div class="flex items-center gap-4">
+<img alt="User profile picture" class="w-12 h-12 rounded-full object-cover border border-outline-variant" data-alt="A macro photography style portrait of an intense, futuristic driver in a neon-lit cyber environment, dark atmospheric lighting, highly detailed." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBaUeh5IE5WjZepWudEkWagxkVA-sIAibsSH_zm2LtiRSKGyFjC6J3WjFjlGGhvVtFRgOTJMFZGa-aD6CBxmqy9P_pLfHglvkIJt3FUiPtiSI1E3bx9DOsdYfQIUMGTOScyMSKWgIWb3PTjmT4ATEQl7lPadI9wkYW0aoeeAJkd1QZTRgEf7jifogmvnj3zIB9o4Rhglpxl_f5XehuGklIYN1_aTyjMLb5y2-vTHQxbGrvnceaLm6-y"/>
+<div>
+<div class="font-headline-md text-electric-cyan">Alex Driver</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">EV &amp; Hybrid Enthusiast</div>
+</div>
+</div>
+</div>
+<nav class="flex flex-col px-2 gap-1 flex-1">
+<!-- Active Item: Map intent overrides JSON list slightly, so we highlight Route Planner -->
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container font-bold rounded-lg m-2" href="#">
+<span class="material-symbols-outlined" data-icon="route">route</span>
+<span>Route Planner</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant m-2 rounded-lg hover:bg-surface-bright transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span>Fuel Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant m-2 rounded-lg hover:bg-surface-bright transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+<span>Saved Locations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant m-2 rounded-lg hover:bg-surface-bright transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="flag">flag</span>
+<span>Community Reports</span>
+</a>
+<div class="mt-auto mb-4">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant m-2 rounded-lg hover:bg-surface-bright transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</nav>
+</div>
+<!-- Backdrop for drawer -->
+<div class="fixed inset-0 bg-background/50 backdrop-blur-sm z-[55] hidden opacity-0 transition-opacity duration-300" id="drawer-backdrop"></div>
+<!-- Left Sidebar: Station List -->
+<aside class="w-[420px] h-full bg-surface-container-lowest/95 backdrop-blur-xl border-r border-outline-variant/30 flex flex-col z-10 shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.5)]">
+<!-- Sidebar Header -->
+<div class="p-5 border-b border-outline-variant/20 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface">Nearby Stations</h2>
+<span class="font-label-caps text-label-caps px-2 py-1 bg-surface-variant rounded text-on-surface-variant">42 RESULTS</span>
+</div>
+<!-- Quick Filters -->
+<div class="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+<button class="shrink-0 px-4 py-1.5 rounded-full border border-electric-cyan text-electric-cyan bg-electric-cyan/10 font-label-caps text-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="bolt">bolt</span> Fast Charge
+                    </button>
+<button class="shrink-0 px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface font-label-caps text-label-caps flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="star">star</span> Top Rated
+                    </button>
+<button class="shrink-0 px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface font-label-caps text-label-caps flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="local_gas_station">local_gas_station</span> Premium Fuel
+                    </button>
+</div>
+</div>
+<!-- Scrollable List -->
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<!-- EV Station Card (Active/Highlighted) -->
+<div class="bg-surface-card rounded-xl p-4 border border-electric-cyan/50 shadow-[0_4px_20px_rgba(47,217,196,0.15)] relative overflow-hidden group cursor-pointer">
+<!-- Subtle glow background -->
+<div class="absolute -right-10 -bottom-10 w-32 h-32 bg-electric-cyan/10 blur-2xl rounded-full pointer-events-none"></div>
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">VoltHub Plaza</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="location_on">location_on</span> 1.2 km • 5 min away
+                            </p>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-metric-xl text-[24px] text-electric-cyan leading-none">150<span class="text-[12px] font-label-caps ml-0.5 text-on-surface-variant">KW</span></span>
+<span class="font-label-caps text-label-caps text-status-optimal mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-status-optimal"></span> 4 Available
+                            </span>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<span class="px-2 py-1 rounded-full border border-outline-variant/50 text-[11px] font-label-caps text-on-surface-variant flex items-center gap-1">
+                            CCS2
+                        </span>
+<span class="px-2 py-1 rounded-full border border-outline-variant/50 text-[11px] font-label-caps text-on-surface-variant flex items-center gap-1">
+                            CHAdeMO
+                        </span>
+</div>
+</div>
+<!-- Combustion Station Card -->
+<div class="bg-surface-card rounded-xl p-4 border border-outline-variant/30 hover:border-fuel-amber/50 transition-colors relative overflow-hidden group cursor-pointer">
+<div class="absolute -right-10 -bottom-10 w-32 h-32 bg-fuel-amber/5 blur-2xl rounded-full pointer-events-none group-hover:bg-fuel-amber/10 transition-colors"></div>
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Apex Energy</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="location_on">location_on</span> 2.8 km • 8 min away
+                            </p>
+</div>
+<!-- ANP Badge -->
+<div class="flex flex-col items-end">
+<div class="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-status-optimal to-emerald-900 border border-status-optimal/30 shadow-[0_0_10px_rgba(46,204,113,0.2)]">
+<span class="font-headline-md text-[16px] text-white">9.8</span>
+</div>
+<span class="font-label-caps text-[10px] text-on-surface-variant mt-1">ANP SCORE</span>
+</div>
+</div>
+<div class="flex justify-between items-end mt-4">
+<div class="flex gap-4">
+<div>
+<div class="font-label-caps text-[10px] text-on-surface-variant">GASOLINE</div>
+<div class="font-metric-xl text-[18px] text-fuel-amber">R$ 5.49</div>
+</div>
+<div>
+<div class="font-label-caps text-[10px] text-on-surface-variant">ETHANOL</div>
+<div class="font-metric-xl text-[18px] text-on-surface">R$ 3.89</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-fuel-amber/50 transition-colors text-[32px] opacity-20" data-icon="local_gas_station" style="font-variation-settings: 'FILL' 1;">local_gas_station</span>
+</div>
+</div>
+<!-- Another EV Card -->
+<div class="bg-surface-card rounded-xl p-4 border border-outline-variant/30 hover:border-electric-cyan/50 transition-colors relative overflow-hidden group cursor-pointer">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">EcoCharge Node 4</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="location_on">location_on</span> 3.5 km • 12 min away
+                            </p>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-metric-xl text-[24px] text-on-surface leading-none group-hover:text-electric-cyan transition-colors">50<span class="text-[12px] font-label-caps ml-0.5 text-on-surface-variant">KW</span></span>
+<span class="font-label-caps text-label-caps text-status-warning mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-status-warning"></span> 1 Available
+                            </span>
+</div>
+</div>
+<div class="flex gap-2 mt-4">
+<span class="px-2 py-1 rounded-full border border-outline-variant/50 text-[11px] font-label-caps text-on-surface-variant flex items-center gap-1">
+                            Type 2
+                        </span>
+</div>
+</div>
+<!-- Combustion Station Card 2 -->
+<div class="bg-surface-card rounded-xl p-4 border border-outline-variant/30 hover:border-fuel-amber/50 transition-colors relative overflow-hidden group cursor-pointer">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Polo Grid Route 6</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="location_on">location_on</span> 4.1 km • 15 min away
+                            </p>
+</div>
+<div class="flex flex-col items-end">
+<div class="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-status-warning to-yellow-900 border border-status-warning/30">
+<span class="font-headline-md text-[16px] text-white">7.2</span>
+</div>
+<span class="font-label-caps text-[10px] text-on-surface-variant mt-1">ANP SCORE</span>
+</div>
+</div>
+<div class="flex justify-between items-end mt-4">
+<div class="flex gap-4">
+<div>
+<div class="font-label-caps text-[10px] text-on-surface-variant">GASOLINE</div>
+<div class="font-metric-xl text-[18px] text-on-surface">R$ 5.72</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-fuel-amber/50 transition-colors text-[32px] opacity-20" data-icon="local_gas_station" style="font-variation-settings: 'FILL' 1;">local_gas_station</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Map Canvas Area -->
+<main class="flex-1 relative h-full bg-surface-dim">
+<!-- Map Background Image -->
+<div class="absolute inset-0 bg-cover bg-center opacity-80 mix-blend-screen" data-alt="A highly detailed, futuristic dark mode digital map interface showing intricate street networks of a sprawling cyber-metropolis. The map utilizes a deep charcoal and jet-black color palette, highlighted by subtle neon cyan and amber glowing traffic lines. Top-down perspective, vector-style rendering with clean tech-aesthetic styling, atmospheric and cinematic." data-location="São Paulo" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDPIsF6jjX1SQ1WmIFnOQ1lce1apVeGJMl9b-6O86WCTPnX-c-_XldzIc3ZOteQJFP2c9CRpndjYoHrfk5y9_AT9UNYcZSofWN69umPkQcK5plYT6BW6_PCI0syRPfWYuXLLAYs0NPl4OHZ26Q4m1PCoZCvf2Do198izXbIUOIWXUTqDbODau0qETWb0HyMkctiY2TePff2DHTqNAt4_w7ezq8X5yzzfCRG1Odclr4ubIWZbHF4EiR4')"></div>
+<!-- Map Overlay Gradients for Depth -->
+<div class="absolute inset-0 bg-gradient-to-r from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-40"></div>
+<!-- Floating Map Controls -->
+<div class="absolute right-map-edge-safe top-map-edge-safe flex flex-col gap-2 z-20">
+<button class="w-12 h-12 bg-surface-card border border-outline-variant/30 rounded-xl flex items-center justify-center text-on-surface hover:bg-surface-variant/80 hover:text-electric-cyan transition-colors shadow-lg backdrop-blur-md">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</button>
+<div class="flex flex-col rounded-xl overflow-hidden shadow-lg border border-outline-variant/30 backdrop-blur-md mt-2">
+<button class="w-12 h-12 bg-surface-card flex items-center justify-center text-on-surface hover:bg-surface-variant/80 transition-colors border-b border-outline-variant/30">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+<button class="w-12 h-12 bg-surface-card flex items-center justify-center text-on-surface hover:bg-surface-variant/80 transition-colors">
+<span class="material-symbols-outlined" data-icon="remove">remove</span>
+</button>
+</div>
+</div>
+<!-- Map Pins -->
+<!-- Active EV Pin (VoltHub Plaza) -->
+<div class="absolute top-1/3 left-1/4 transform -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer flex flex-col items-center group">
+<!-- Info Bubble -->
+<div class="bg-surface-card border border-electric-cyan px-3 py-1.5 rounded-lg mb-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-2 backdrop-blur-md opacity-100 transition-opacity">
+<span class="font-metric-xl text-[16px] text-electric-cyan">150kW</span>
+</div>
+<!-- Pin Body -->
+<div class="w-12 h-12 rounded-full bg-surface-container-highest border-2 border-electric-cyan flex items-center justify-center glow-cyan pulse-cyan scale-110 relative">
+<div class="absolute inset-0 bg-electric-cyan/20 rounded-full animate-ping opacity-75"></div>
+<span class="material-symbols-outlined text-electric-cyan" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<!-- Shadow/Anchor -->
+<div class="w-4 h-1 bg-black/50 blur-sm rounded-[100%] mt-2"></div>
+</div>
+<!-- Combustion Pin (Apex Energy) -->
+<div class="absolute top-[60%] left-[50%] transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer flex flex-col items-center group">
+<div class="bg-surface-card border border-outline-variant px-3 py-1.5 rounded-lg mb-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-2 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
+<span class="font-headline-md text-[14px] text-status-optimal flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span> 9.8
+                    </span>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-fuel-amber flex items-center justify-center shadow-[0_0_10px_rgba(255,122,26,0.3)] hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-fuel-amber text-[20px]" data-icon="local_gas_station" style="font-variation-settings: 'FILL' 1;">local_gas_station</span>
+</div>
+<div class="w-3 h-1 bg-black/50 blur-sm rounded-[100%] mt-1"></div>
+</div>
+<!-- Smaller EV Pin -->
+<div class="absolute top-[20%] left-[65%] transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer flex flex-col items-center group">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center hover:border-electric-cyan hover:shadow-[0_0_10px_rgba(47,217,196,0.3)] hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-electric-cyan text-[16px]" data-icon="bolt">bolt</span>
+</div>
+</div>
+<!-- Smaller Combustion Pin -->
+<div class="absolute top-[75%] left-[30%] transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer flex flex-col items-center group">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center hover:border-fuel-amber hover:shadow-[0_0_10px_rgba(255,122,26,0.3)] hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-fuel-amber text-[16px]" data-icon="local_gas_station">local_gas_station</span>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuBtn = document.getElementById('menu-btn');
+            const drawer = document.getElementById('nav-drawer');
+            const backdrop = document.getElementById('drawer-backdrop');
+
+            function toggleDrawer() {
+                const isOpen = drawer.classList.contains('translate-x-0');
+                if (isOpen) {
+                    drawer.classList.remove('translate-x-0');
+                    drawer.classList.add('-translate-x-full');
+                    backdrop.classList.add('opacity-0');
+                    setTimeout(() => backdrop.classList.add('hidden'), 300);
+                } else {
+                    drawer.classList.remove('-translate-x-full');
+                    drawer.classList.add('translate-x-0');
+                    backdrop.classList.remove('hidden');
+                    // Force reflow
+                    void backdrop.offsetWidth;
+                    backdrop.classList.remove('opacity-0');
+                }
+            }
+
+            menuBtn.addEventListener('click', toggleDrawer);
+            backdrop.addEventListener('click', toggleDrawer);
+        });
+    </script>
+</body></html>
