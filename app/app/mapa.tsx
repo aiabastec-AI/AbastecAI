@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,6 +27,8 @@ import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
+import { FichaPosto } from "../src/components/FichaPosto";
+import { FichaRecarga } from "../src/components/FichaRecarga";
 
 // Versão web da tela do mapa (app/index.tsx é a versão nativa, com react-native-maps —
 // bibliotecas de mapa diferentes por plataforma, sem equivalente 1:1, então em vez de uma
@@ -74,6 +77,10 @@ export default function MapaWebScreen() {
   const zoomAtualRef = useRef(12);
   const [centroMapa, setCentroMapa] = useState({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
   const [zoomMapa, setZoomMapa] = useState(12);
+
+  const [selecionado, setSelecionado] = useState<{ tipo: "posto" | "recarga"; id: string } | null>(
+    null
+  );
 
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [permissaoNegada, setPermissaoNegada] = useState(false);
@@ -260,6 +267,7 @@ export default function MapaWebScreen() {
           zoom={zoomMapa}
           onCenterChanged={() => {}}
           onCameraChanged={aoCameraMudar}
+          onClick={() => setSelecionado(null)}
           onZoomChanged={(e) => {
             zoomAtualRef.current = e.detail.zoom;
             setZoomMapa(e.detail.zoom);
@@ -274,9 +282,7 @@ export default function MapaWebScreen() {
               key={`${item.tipo}-${item.id}`}
               position={{ lat: item.latitude, lng: item.longitude }}
               icon={criarIconePin(item.cor, item.patrocinado)}
-              onClick={() =>
-                router.push(item.tipo === "posto" ? `/posto/${item.id}` : `/recarga/${item.id}`)
-              }
+              onClick={() => setSelecionado({ tipo: item.tipo, id: item.id })}
             />
           ))}
         </Map>
@@ -350,9 +356,7 @@ export default function MapaWebScreen() {
               item={item}
               colors={colors}
               patrocinado={patrocinados.has(item.dado.id)}
-              onPress={() =>
-                router.push(item.tipo === "posto" ? `/posto/${item.dado.id}` : `/recarga/${item.dado.id}`)
-              }
+              onPress={() => setSelecionado({ tipo: item.tipo, id: item.dado.id })}
             />
           )}
         />
@@ -408,6 +412,28 @@ export default function MapaWebScreen() {
               <Text style={styles.botaoSecundarioTexto}>Agora não</Text>
             </Pressable>
           </View>
+        </View>
+      )}
+
+      {selecionado && (
+        <View style={styles.painelLateral}>
+          <View style={styles.painelTopo}>
+            <Pressable
+              style={styles.painelFechar}
+              onPress={() => setSelecionado(null)}
+              accessibilityLabel="Fechar"
+              accessibilityRole="button"
+            >
+              <MaterialCommunityIcons name="close" size={18} color={colors.textPrimary} />
+            </Pressable>
+          </View>
+          <ScrollView style={styles.painelScroll} contentContainerStyle={styles.painelConteudo}>
+            {selecionado.tipo === "posto" ? (
+              <FichaPosto id={selecionado.id} />
+            ) : (
+              <FichaRecarga id={selecionado.id} />
+            )}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -574,5 +600,32 @@ function criarEstilos(colors: ThemeColors) {
       borderColor: colors.border,
     },
     botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+    painelLateral: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: 420,
+      maxWidth: "100%",
+      backgroundColor: colors.background,
+      borderLeftWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      boxShadow: "-8px 0px 24px rgba(0, 0, 0, 0.3)",
+    },
+    painelTopo: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      padding: 12,
+    },
+    painelFechar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    painelScroll: { flex: 1 },
+    painelConteudo: { padding: 20, paddingTop: 0, gap: 16 },
   });
 }
