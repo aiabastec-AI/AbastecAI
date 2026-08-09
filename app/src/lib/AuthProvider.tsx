@@ -12,15 +12,10 @@ import { registrarPushToken } from "./pushNotifications";
 // pro app (recomendação oficial do expo-web-browser pra WebBrowser.openAuthSessionAsync).
 WebBrowser.maybeCompleteAuthSession();
 
-// Mensagens de erro do Supabase vêm em inglês — traduz as mais comuns pra manter
-// o app 100% em português; erros não mapeados caem no texto original mesmo.
+// Mensagens de erro do Supabase/Google vêm em inglês — traduz as conhecidas pra
+// manter o app 100% em português; erros não mapeados caem no texto original mesmo.
 function traduzirErro(mensagem: string): string {
-  const mapa: Record<string, string> = {
-    "Invalid login credentials": "E-mail ou senha incorretos.",
-    "User already registered": "Já existe uma conta com esse e-mail.",
-    "Password should be at least 6 characters": "A senha precisa ter pelo menos 6 caracteres.",
-    "Unable to validate email address: invalid format": "E-mail em formato inválido.",
-  };
+  const mapa: Record<string, string> = {};
   return mapa[mensagem] ?? mensagem;
 }
 
@@ -81,21 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => assinatura.subscription.unsubscribe();
   }, []);
 
-  async function entrar(email: string, senha: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    return { erro: error ? traduzirErro(error.message) : null };
-  }
-
-  async function cadastrar(email: string, senha: string, nome?: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password: senha });
-    if (error) return { erro: traduzirErro(error.message) };
-    if (data.session && nome) {
-      const u = await buscarOuCriarUsuario(data.session.user.id);
-      if (u) await supabase.from("usuarios").update({ nome }).eq("id", u.id);
-    }
-    return { erro: null };
-  }
-
   async function sair() {
     await supabase.auth.signOut();
   }
@@ -138,9 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider
-      value={{ session, usuario, carregando, entrar, cadastrar, entrarComGoogle, sair }}
-    >
+    <AuthContext.Provider value={{ session, usuario, carregando, entrarComGoogle, sair }}>
       {children}
     </AuthContext.Provider>
   );

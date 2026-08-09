@@ -3,8 +3,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Volta do redirect OAuth (Google) com um `code` de PKCE na URL. Troca o
-// código pela sessão (grava os cookies via criarClienteServidor) e reaplica
-// o mesmo gate de admin_usuarios que entrarAction já faz pro login por senha.
+// código pela sessão (grava os cookies via criarClienteServidor) e checa o
+// gate de admin_usuarios — sem isso, qualquer conta Google entraria no painel.
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");

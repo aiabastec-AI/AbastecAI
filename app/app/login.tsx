@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
@@ -10,41 +10,17 @@ import { GlassPanel } from "../src/components/GlassPanel";
 
 export default function Login() {
   const router = useRouter();
-  const { entrar, cadastrar, entrarComGoogle } = useAuth();
+  const { entrarComGoogle } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
-  const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [nome, setNome] = useState("");
   const [carregando, setCarregando] = useState(false);
-  const [carregandoGoogle, setCarregandoGoogle] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function aoConfirmar() {
-    if (!email.trim() || !senha) {
-      setErro("Preenche e-mail e senha.");
-      return;
-    }
+  async function aoEntrarComGoogle() {
     setCarregando(true);
     setErro(null);
-    const resultado =
-      modo === "entrar"
-        ? await entrar(email.trim(), senha)
-        : await cadastrar(email.trim(), senha, nome.trim() || undefined);
-    setCarregando(false);
-    if (resultado.erro) {
-      setErro(resultado.erro);
-      return;
-    }
-    router.back();
-  }
-
-  async function aoEntrarComGoogle() {
-    setCarregandoGoogle(true);
-    setErro(null);
     const resultado = await entrarComGoogle();
-    setCarregandoGoogle(false);
+    setCarregando(false);
     if (resultado.erro) {
       setErro(resultado.erro);
       return;
@@ -56,81 +32,22 @@ export default function Login() {
     <View style={styles.container}>
       <BotaoVoltar />
       <View style={styles.centralizador}>
-      <GlassPanel style={styles.card}>
-        <Text style={styles.titulo}>{modo === "entrar" ? "Entrar" : "Criar conta"}</Text>
-        <Text style={styles.subtitulo}>
-          Login é opcional — só é necessário pra favoritar postos e deixar avaliações.
-        </Text>
-
-        {modo === "cadastrar" && (
-          <TextInput
-            style={styles.input}
-            placeholder="Nome (opcional)"
-            placeholderTextColor={colors.textSecondary}
-            value={nome}
-            onChangeText={setNome}
-          />
-        )}
-        <TextInput
-          style={styles.input}
-          placeholder="E-mail"
-          placeholderTextColor={colors.textSecondary}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor={colors.textSecondary}
-          value={senha}
-          onChangeText={setSenha}
-          secureTextEntry
-        />
-
-        {erro && <Text style={styles.aviso}>{erro}</Text>}
-
-        <Pressable style={styles.botaoPrimario} onPress={aoConfirmar} disabled={carregando}>
-          {carregando ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <Text style={styles.botaoPrimarioTexto}>
-              {modo === "entrar" ? "Entrar" : "Criar conta"}
-            </Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={styles.botaoSecundario}
-          onPress={() => {
-            setModo(modo === "entrar" ? "cadastrar" : "entrar");
-            setErro(null);
-          }}
-        >
-          <Text style={styles.botaoSecundarioTexto}>
-            {modo === "entrar" ? "Não tenho conta — criar uma" : "Já tenho conta — entrar"}
+        <GlassPanel style={styles.card}>
+          <Text style={styles.titulo}>Entrar</Text>
+          <Text style={styles.subtitulo}>
+            Login é opcional — só é necessário pra favoritar postos e deixar avaliações.
           </Text>
-        </Pressable>
 
-        <View style={styles.divisor}>
-          <View style={styles.divisorLinha} />
-          <Text style={styles.divisorTexto}>ou</Text>
-          <View style={styles.divisorLinha} />
-        </View>
+          {erro && <Text style={styles.aviso}>{erro}</Text>}
 
-        <Pressable
-          style={styles.botaoGoogle}
-          onPress={aoEntrarComGoogle}
-          disabled={carregando || carregandoGoogle}
-        >
-          {carregandoGoogle ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <Text style={styles.botaoGoogleTexto}>Continuar com Google</Text>
-          )}
-        </Pressable>
-      </GlassPanel>
+          <Pressable style={styles.botaoGoogle} onPress={aoEntrarComGoogle} disabled={carregando}>
+            {carregando ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
+              <Text style={styles.botaoGoogleTexto}>Continuar com Google</Text>
+            )}
+          </Pressable>
+        </GlassPanel>
       </View>
     </View>
   );
@@ -143,29 +60,7 @@ function criarEstilos(colors: ThemeColors) {
     card: { borderRadius: 20, padding: 24, gap: 12 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 22, lineHeight: 28 },
     subtitulo: { ...tipografia.bodySm, color: colors.textSecondary, marginBottom: 4 },
-    input: {
-      backgroundColor: colors.surfaceElevated,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      color: colors.textPrimary,
-      fontFamily: "Inter_400Regular",
-      fontSize: 15,
-    },
     aviso: { color: colors.notaBaixa, fontSize: 12 },
-    botaoPrimario: {
-      backgroundColor: colors.textPrimary,
-      borderRadius: 14,
-      paddingVertical: 14,
-      alignItems: "center",
-      marginTop: 4,
-    },
-    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
-    botaoSecundario: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
-    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
-    divisor: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
-    divisorLinha: { flex: 1, height: 1, backgroundColor: colors.surfaceGlassBorder },
-    divisorTexto: { color: colors.textSecondary, fontSize: 12, fontFamily: "Inter_400Regular" },
     botaoGoogle: {
       backgroundColor: colors.surfaceElevated,
       borderRadius: 14,
@@ -173,6 +68,7 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
       borderWidth: 1,
       borderColor: colors.surfaceGlassBorder,
+      marginTop: 4,
     },
     botaoGoogleTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 15 },
   });
