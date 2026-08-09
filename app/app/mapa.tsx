@@ -45,7 +45,7 @@ const CENTRO_INICIAL_LNG = -46.6333;
 function raioBuscaM(zoom: number, lat: number): number {
   const metrosPorPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
   const raio = metrosPorPixel * 700;
-  return Math.min(Math.max(raio, 3000), 150000);
+  return Math.round(Math.min(Math.max(raio, 3000), 150000));
 }
 
 const GOOGLE_MAPS_WEB_API_KEY = Constants.expoConfig?.extra?.googleMapsWebApiKey as string | undefined;
