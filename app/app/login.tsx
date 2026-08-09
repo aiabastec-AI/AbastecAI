@@ -10,7 +10,7 @@ import { GlassPanel } from "../src/components/GlassPanel";
 
 export default function Login() {
   const router = useRouter();
-  const { entrar, cadastrar } = useAuth();
+  const { entrar, cadastrar, entrarComGoogle } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
@@ -18,6 +18,7 @@ export default function Login() {
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [carregandoGoogle, setCarregandoGoogle] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function aoConfirmar() {
@@ -32,6 +33,18 @@ export default function Login() {
         ? await entrar(email.trim(), senha)
         : await cadastrar(email.trim(), senha, nome.trim() || undefined);
     setCarregando(false);
+    if (resultado.erro) {
+      setErro(resultado.erro);
+      return;
+    }
+    router.back();
+  }
+
+  async function aoEntrarComGoogle() {
+    setCarregandoGoogle(true);
+    setErro(null);
+    const resultado = await entrarComGoogle();
+    setCarregandoGoogle(false);
     if (resultado.erro) {
       setErro(resultado.erro);
       return;
@@ -99,6 +112,24 @@ export default function Login() {
             {modo === "entrar" ? "Não tenho conta — criar uma" : "Já tenho conta — entrar"}
           </Text>
         </Pressable>
+
+        <View style={styles.divisor}>
+          <View style={styles.divisorLinha} />
+          <Text style={styles.divisorTexto}>ou</Text>
+          <View style={styles.divisorLinha} />
+        </View>
+
+        <Pressable
+          style={styles.botaoGoogle}
+          onPress={aoEntrarComGoogle}
+          disabled={carregando || carregandoGoogle}
+        >
+          {carregandoGoogle ? (
+            <ActivityIndicator color={colors.textPrimary} />
+          ) : (
+            <Text style={styles.botaoGoogleTexto}>Continuar com Google</Text>
+          )}
+        </Pressable>
       </GlassPanel>
       </View>
     </View>
@@ -132,5 +163,17 @@ function criarEstilos(colors: ThemeColors) {
     botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     botaoSecundario: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
     botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+    divisor: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
+    divisorLinha: { flex: 1, height: 1, backgroundColor: colors.surfaceGlassBorder },
+    divisorTexto: { color: colors.textSecondary, fontSize: 12, fontFamily: "Inter_400Regular" },
+    botaoGoogle: {
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+    },
+    botaoGoogleTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 15 },
   });
 }

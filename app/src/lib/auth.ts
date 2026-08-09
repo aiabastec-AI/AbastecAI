@@ -13,6 +13,7 @@ export interface AuthState {
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<{ erro: string | null }>;
   cadastrar: (email: string, senha: string, nome?: string) => Promise<{ erro: string | null }>;
+  entrarComGoogle: () => Promise<{ erro: string | null }>;
   sair: () => Promise<void>;
 }
 

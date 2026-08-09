@@ -1,8 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Platform } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import { makeRedirectUri } from "expo-auth-session";
+import { getQueryParams } from "expo-auth-session/build/QueryParams";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { AuthContext, type Usuario } from "./auth";
 import { registrarPushToken } from "./pushNotifications";
+
+// Fecha o navegador de autenticação automaticamente depois do redirect de volta
+// pro app (recomendação oficial do expo-web-browser pra WebBrowser.openAuthSessionAsync).
+WebBrowser.maybeCompleteAuthSession();
 
 // Mensagens de erro do Supabase vêm em inglês — traduz as mais comuns pra manter
 // o app 100% em português; erros não mapeados caem no texto original mesmo.
@@ -92,8 +100,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  // Web: deixa o Supabase fazer o redirect completo de página pro Google e,
+  // na volta, ler a sessão direto da URL (detectSessionInUrl, ver supabase.ts).
+  // Nativo: não existe redirect de página, então abrimos o navegador de auth
+  // manualmente e capturamos os tokens do deep link "abastecai://" na volta.
+  async function entrarComGoogle() {
+    if (Platform.OS === "web") {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/mapa` },
+      });
+      return { erro: error ? traduzirErro(error.message) : null };
+    }
+
+    const redirectTo = makeRedirectUri();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) return { erro: traduzirErro(error.message) };
+    if (!data.url) return { erro: "Não foi possível iniciar o login com Google." };
+
+    const resultado = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (resultado.type !== "success" || !resultado.url) {
+      return { erro: null };
+    }
+
+    const { params, errorCode } = getQueryParams(resultado.url);
+    if (errorCode) return { erro: traduzirErro(errorCode) };
+    if (!params.access_token || !params.refresh_token) return { erro: null };
+
+    const { error: erroSessao } = await supabase.auth.setSession({
+      access_token: params.access_token,
+      refresh_token: params.refresh_token,
+    });
+    return { erro: erroSessao ? traduzirErro(erroSessao.message) : null };
+  }
+
   return (
-    <AuthContext.Provider value={{ session, usuario, carregando, entrar, cadastrar, sair }}>
+    <AuthContext.Provider
+      value={{ session, usuario, carregando, entrar, cadastrar, entrarComGoogle, sair }}
+    >
       {children}
     </AuthContext.Provider>
   );
