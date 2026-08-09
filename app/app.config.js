@@ -29,14 +29,15 @@ module.exports = {
     web: {
       favicon: "./assets/favicon.png",
     },
-    // O token secreto de download (sk. / Downloads:Read) NÃO vai como opção
-    // do plugin (RNMapboxMapsDownloadToken está deprecado e gravaria o valor
-    // em gradle.properties). O @rnmapbox/maps lê direto de
-    // process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN, que o dotenv.config() acima
-    // já injetou a partir do .env.local da raiz.
     plugins: [
       "expo-router",
-      "@rnmapbox/maps",
+      [
+        "react-native-maps",
+        {
+          androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
+          iosGoogleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
+        },
+      ],
       [
         "expo-location",
         {
@@ -55,11 +56,11 @@ module.exports = {
       ],
     ],
     extra: {
-      // Só valores seguros pro cliente: publishable key (não a secret) e o
-      // token público (pk.) do Mapbox.
+      // Só valores seguros pro cliente: publishable key (não a secret) e a
+      // chave de mapa restrita à API JavaScript (usada só na versão web).
       supabaseUrl: process.env.SUPABASE_URL,
       supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
-      mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN,
+      googleMapsWebApiKey: process.env.GOOGLE_MAPS_WEB_API_KEY,
     },
   },
 };
