@@ -20,7 +20,10 @@ export function BotaoVoltar() {
       onPress={aoTocar}
       accessibilityLabel="Voltar"
       accessibilityRole="button"
-      style={[styles.botao, { backgroundColor: colors.card }]}
+      style={[
+        styles.botao,
+        { backgroundColor: colors.surfaceGlass, borderColor: colors.surfaceGlassBorder },
+      ]}
     >
       <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
     </Pressable>
@@ -32,6 +35,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-start",

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { corDaNota, type ThemeColors } from "../../src/theme";
+import { corDaNota, glowDaNota, type ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
+import { tipografia } from "../../src/typography";
 import {
   buscarHistoricoFiscalizacao,
   buscarPostoPorId,
@@ -12,6 +13,7 @@ import {
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
+import { AnelNota } from "../../src/components/AnelNota";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: [] };
@@ -87,10 +89,17 @@ export default function FichaPosto() {
       <View style={styles.header}>
         <Text style={styles.nome}>{nome}</Text>
         {posto.nota_anp != null ? (
-          <View style={[styles.notaBadge, { backgroundColor: corDaNota(posto.nota_anp, colors) + "33" }]}>
-            <Text style={[styles.notaTexto, { color: corDaNota(posto.nota_anp, colors) }]}>
-              {posto.nota_anp.toFixed(1)}
-            </Text>
+          <View style={{ boxShadow: glowDaNota(posto.nota_anp, colors) }}>
+            <AnelNota
+              nota={posto.nota_anp}
+              tamanho={64}
+              corProgresso={corDaNota(posto.nota_anp, colors)}
+              corTrilho={colors.border}
+            >
+              <Text style={[styles.notaTexto, { color: colors.textPrimary }]}>
+                {posto.nota_anp.toFixed(1)}
+              </Text>
+            </AnelNota>
           </View>
         ) : (
           // nota_anp só fica null quando não existe nenhuma fiscalização/amostra nos
@@ -191,12 +200,12 @@ function criarEstilos(colors: ThemeColors) {
     centralizado: { alignItems: "center", justifyContent: "center" },
     conteudo: { padding: 20, gap: 16 },
     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    nome: { color: colors.textPrimary, fontSize: 22, fontWeight: "700", flexShrink: 1 },
+    nome: { ...tipografia.headlineLgMobile, color: colors.textPrimary, flexShrink: 1 },
     notaBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16 },
-    notaTexto: { fontWeight: "800", fontSize: 26 },
-    notaIndisponivelTexto: { color: colors.textSecondary, fontWeight: "700", fontSize: 12 },
-    resumoTexto: { color: colors.textSecondary, fontSize: 12, fontWeight: "600" },
-    bandeira: { color: colors.textSecondary, fontSize: 14 },
+    notaTexto: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 20 },
+    notaIndisponivelTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+    resumoTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+    bandeira: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 14 },
     patrocinadoBadge: {
       alignSelf: "flex-start",
       backgroundColor: colors.notaMedia,
@@ -204,20 +213,21 @@ function criarEstilos(colors: ThemeColors) {
       paddingVertical: 4,
       borderRadius: 10,
     },
-    patrocinadoTexto: { color: colors.background, fontWeight: "700", fontSize: 11 },
-    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 10 },
-    tituloCard: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
+    patrocinadoTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 11 },
+    card: { backgroundColor: colors.surfaceElevated, borderRadius: 14, padding: 16, gap: 10 },
+    tituloCard: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 15, lineHeight: 20 },
     linha: { gap: 2 },
-    linhaLabel: { color: colors.textSecondary, fontSize: 12 },
-    linhaValor: { color: colors.textPrimary, fontSize: 15 },
-    texto: { color: colors.textSecondary, fontSize: 13 },
+    linhaLabel: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 11 },
+    linhaValor: { ...tipografia.bodyMd, color: colors.textPrimary, fontSize: 15, lineHeight: 20 },
+    texto: { ...tipografia.bodySm, color: colors.textSecondary },
     botaoPrimario: {
       backgroundColor: colors.combustivel,
       borderRadius: 14,
       paddingVertical: 14,
       alignItems: "center",
+      boxShadow: colors.glowCombustivel,
     },
-    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     botaoSecundario: {
       borderRadius: 14,
       paddingVertical: 14,
@@ -225,6 +235,6 @@ function criarEstilos(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 14 },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
   });
 }

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import type { ThemeColors } from "../theme";
 import type { PostoProximo } from "../lib/postos";
 import type { PontoRecargaProximo } from "../lib/recarga";
+import { tipografia } from "../typography";
 
 export type ItemProximo =
   | { tipo: "posto"; dado: PostoProximo }
@@ -25,7 +26,8 @@ export function CardResultadoProximo({
   onPress: () => void;
 }) {
   const corTipo = item.tipo === "posto" ? colors.combustivel : colors.eletrico;
-  const styles = criarEstilos(colors, corTipo);
+  const glowTipo = item.tipo === "posto" ? colors.glowCombustivel : colors.glowEletrico;
+  const styles = criarEstilos(colors, corTipo, glowTipo);
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -47,7 +49,7 @@ export function CardResultadoProximo({
   );
 }
 
-function criarEstilos(colors: ThemeColors, corTipo: string) {
+function criarEstilos(colors: ThemeColors, corTipo: string, glowTipo: string) {
   return StyleSheet.create({
     card: {
       width: 170,
@@ -57,9 +59,10 @@ function criarEstilos(colors: ThemeColors, corTipo: string) {
       borderColor: corTipo + "55",
       padding: 14,
       gap: 4,
+      boxShadow: glowTipo,
     },
-    nome: { color: colors.textPrimary, fontWeight: "700", fontSize: 14 },
-    distancia: { color: colors.textSecondary, fontSize: 12 },
-    badge: { color: corTipo, fontWeight: "700", fontSize: 12, marginTop: 4 },
+    nome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+    distancia: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
+    badge: { ...tipografia.labelCaps, color: corTipo, fontSize: 11, marginTop: 4 },
   });
 }

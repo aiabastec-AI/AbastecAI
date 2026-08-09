@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ThemeColors } from "../theme";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/ThemeProvider";
@@ -26,7 +27,8 @@ export function BotaoFavorito({ alvo }: { alvo: Alvo }) {
   if (!usuario) {
     return (
       <Pressable style={styles.botao} onPress={() => router.push("/login")}>
-        <Text style={styles.textoInativo}>☆ Entrar pra favoritar</Text>
+        <MaterialCommunityIcons name="star-outline" size={16} color={colors.textSecondary} />
+        <Text style={styles.textoInativo}>Entrar pra favoritar</Text>
       </Pressable>
     );
   }
@@ -43,13 +45,27 @@ export function BotaoFavorito({ alvo }: { alvo: Alvo }) {
   }
 
   return (
-    <Pressable style={styles.botao} onPress={aoTocar} disabled={carregando || favoritado === null}>
+    <Pressable
+      style={[
+        styles.botao,
+        favoritado ? { borderColor: colors.notaMedia, boxShadow: colors.glowNotaMedia } : null,
+      ]}
+      onPress={aoTocar}
+      disabled={carregando || favoritado === null}
+    >
       {carregando || favoritado === null ? (
         <ActivityIndicator size="small" color={colors.textSecondary} />
       ) : (
-        <Text style={favoritado ? styles.textoAtivo : styles.textoInativo}>
-          {favoritado ? "★ Favoritado" : "☆ Favoritar"}
-        </Text>
+        <>
+          <MaterialCommunityIcons
+            name={favoritado ? "star" : "star-outline"}
+            size={16}
+            color={favoritado ? colors.notaMedia : colors.textSecondary}
+          />
+          <Text style={favoritado ? styles.textoAtivo : styles.textoInativo}>
+            {favoritado ? "Favoritado" : "Favoritar"}
+          </Text>
+        </>
       )}
     </Pressable>
   );
@@ -58,6 +74,9 @@ export function BotaoFavorito({ alvo }: { alvo: Alvo }) {
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     botao: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
       alignSelf: "flex-start",
       paddingHorizontal: 14,
       paddingVertical: 8,
@@ -65,7 +84,7 @@ function criarEstilos(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    textoAtivo: { color: colors.notaMedia, fontWeight: "700", fontSize: 13 },
-    textoInativo: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+    textoAtivo: { color: colors.notaMedia, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+    textoInativo: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
   });
 }

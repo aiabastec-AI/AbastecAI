@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { corDaNota, type ThemeColors } from "../src/theme";
+import { corDaNota, glowDaNota, type ThemeColors } from "../src/theme";
 import { useFiltros } from "../src/lib/filtros";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
+import { PillToggle } from "../src/components/PillToggle";
 
 // Precisa bater com os valores de ConnectionType.Title que a Open Charge Map devolve
 // (ver supabase/functions/sync-ocm) — senão o filtro não casa com nada no banco.
@@ -40,21 +42,18 @@ export default function Filtros() {
         <Text style={styles.rotulo}>Combustível — nota mínima</Text>
         <View style={styles.notaLinha}>
           {[0, 1, 2, 3, 4, 5].map((n) => (
-            <Pressable
+            <PillToggle
               key={n}
+              ativo={notaMinima === n}
+              cor={corDaNota(n, colors)}
               onPress={() => setNotaMinima(n)}
-              style={[
-                styles.notaChip,
-                { borderColor: corDaNota(n, colors) },
-                notaMinima === n && { backgroundColor: corDaNota(n, colors) },
-              ]}
+              accessibilityLabel={`Nota mínima ${n}`}
+              style={styles.notaChip}
             >
-              <Text
-                style={[styles.notaChipTexto, notaMinima === n && { color: colors.background }]}
-              >
+              <Text style={[styles.notaChipTexto, notaMinima === n && { color: corDaNota(n, colors) }]}>
                 {n}
               </Text>
-            </Pressable>
+            </PillToggle>
           ))}
         </View>
       </View>
@@ -65,15 +64,15 @@ export default function Filtros() {
           {CONECTORES.map((conector) => {
             const ativo = conectoresAtivos.includes(conector);
             return (
-              <Pressable
+              <PillToggle
                 key={conector}
+                ativo={ativo}
+                cor={colors.eletrico}
                 onPress={() => alternarConector(conector)}
-                style={[styles.chip, ativo && { backgroundColor: colors.eletrico }]}
+                accessibilityLabel={conector}
               >
-                <Text style={[styles.chipTexto, ativo && { color: colors.background }]}>
-                  {conector}
-                </Text>
-              </Pressable>
+                <Text style={[styles.chipTexto, ativo && { color: colors.eletrico }]}>{conector}</Text>
+              </PillToggle>
             );
           })}
         </View>
@@ -95,27 +94,20 @@ function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 24 },
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
-    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     secao: { gap: 12 },
-    rotulo: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
+    rotulo: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 11 },
     notaLinha: { flexDirection: "row", gap: 8 },
     notaChip: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      borderWidth: 1.5,
-      alignItems: "center",
-      justifyContent: "center",
+      paddingHorizontal: 0,
+      paddingVertical: 0,
     },
-    notaChipTexto: { color: colors.textPrimary, fontWeight: "700" },
+    notaChipTexto: { color: colors.textPrimary, fontFamily: "SpaceGrotesk_600SemiBold" },
     chipsLinha: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-    chip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 16,
-      backgroundColor: colors.card,
-    },
-    chipTexto: { color: colors.textPrimary, fontWeight: "600", fontSize: 13 },
+    chipTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     botoes: { flexDirection: "row", gap: 10, marginTop: "auto" },
     botaoSecundario: {
       flex: 1,
@@ -125,7 +117,7 @@ function criarEstilos(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600" },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" },
     botaoPrimario: {
       flex: 1,
       borderRadius: 14,
@@ -133,6 +125,6 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
       backgroundColor: colors.textPrimary,
     },
-    botaoPrimarioTexto: { color: colors.background, fontWeight: "700" },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold" },
   });
 }

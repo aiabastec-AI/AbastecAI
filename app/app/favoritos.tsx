@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { buscarFavoritos, type FavoritoItem } from "../src/lib/social";
 
@@ -75,16 +76,16 @@ function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
     centralizado: { alignItems: "center", justifyContent: "center" },
-    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-    texto: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
-    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 4 },
-    cardNome: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
+    texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
+    card: { backgroundColor: colors.surfaceElevated, borderRadius: 14, padding: 16, gap: 4 },
+    cardNome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     botaoPrimario: {
       backgroundColor: colors.textPrimary,
       borderRadius: 12,
       paddingVertical: 12,
       alignItems: "center",
     },
-    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 14 },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 14 },
   });
 }

@@ -4,7 +4,9 @@ import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
+import { GlassPanel } from "../src/components/GlassPanel";
 
 export default function Login() {
   const router = useRouter();
@@ -41,7 +43,7 @@ export default function Login() {
     <View style={styles.container}>
       <BotaoVoltar />
       <View style={styles.centralizador}>
-      <View style={styles.card}>
+      <GlassPanel style={styles.card}>
         <Text style={styles.titulo}>{modo === "entrar" ? "Entrar" : "Criar conta"}</Text>
         <Text style={styles.subtitulo}>
           Login é opcional — só é necessário pra favoritar postos e deixar avaliações.
@@ -97,7 +99,7 @@ export default function Login() {
             {modo === "entrar" ? "Não tenho conta — criar uma" : "Já tenho conta — entrar"}
           </Text>
         </Pressable>
-      </View>
+      </GlassPanel>
       </View>
     </View>
   );
@@ -107,15 +109,16 @@ function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 16 },
     centralizador: { flex: 1, justifyContent: "center" },
-    card: { backgroundColor: colors.card, borderRadius: 20, padding: 24, gap: 12 },
-    titulo: { color: colors.textPrimary, fontSize: 22, fontWeight: "700" },
-    subtitulo: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 4 },
+    card: { borderRadius: 20, padding: 24, gap: 12 },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 22, lineHeight: 28 },
+    subtitulo: { ...tipografia.bodySm, color: colors.textSecondary, marginBottom: 4 },
     input: {
-      backgroundColor: colors.background,
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 12,
       color: colors.textPrimary,
+      fontFamily: "Inter_400Regular",
       fontSize: 15,
     },
     aviso: { color: colors.notaBaixa, fontSize: 12 },
@@ -126,8 +129,8 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
       marginTop: 4,
     },
-    botaoPrimarioTexto: { color: colors.background, fontWeight: "700", fontSize: 15 },
+    botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     botaoSecundario: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
-    botaoSecundarioTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+    botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
   });
 }

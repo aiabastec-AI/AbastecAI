@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ThemeColors } from "../theme";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/ThemeProvider";
+import { tipografia } from "../typography";
 import {
   buscarAvaliacoes,
   buscarMinhaAvaliacao,
@@ -64,7 +66,11 @@ export function SecaoAvaliacoes({ alvo }: { alvo: Alvo }) {
           <View style={styles.estrelas}>
             {[1, 2, 3, 4, 5].map((n) => (
               <Pressable key={n} onPress={() => setMinhaNota(n)}>
-                <Text style={[styles.estrela, n <= minhaNota && styles.estrelaAtiva]}>★</Text>
+                <MaterialCommunityIcons
+                  name={n <= minhaNota ? "star" : "star-outline"}
+                  size={26}
+                  color={n <= minhaNota ? colors.notaMedia : colors.border}
+                />
               </Pressable>
             ))}
           </View>
@@ -102,7 +108,11 @@ export function SecaoAvaliacoes({ alvo }: { alvo: Alvo }) {
         avaliacoes.map((a) => (
           <View key={a.id} style={styles.avaliacao}>
             <View style={styles.avaliacaoHeader}>
-              <Text style={styles.avaliacaoNota}>{"★".repeat(a.nota)}</Text>
+              <View style={styles.avaliacaoEstrelas}>
+                {Array.from({ length: a.nota }).map((_, i) => (
+                  <MaterialCommunityIcons key={i} name="star" size={12} color={colors.notaMedia} />
+                ))}
+              </View>
               <Text style={styles.avaliacaoData}>{formatarData(a.created_at)}</Text>
             </View>
             {a.comentario && <Text style={styles.texto}>{a.comentario}</Text>}
@@ -115,20 +125,19 @@ export function SecaoAvaliacoes({ alvo }: { alvo: Alvo }) {
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
-    card: { backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 12 },
-    titulo: { color: colors.textPrimary, fontWeight: "700", fontSize: 15 },
-    aviso: { color: colors.textSecondary, fontSize: 11, marginTop: -8 },
-    texto: { color: colors.textSecondary, fontSize: 13 },
+    card: { backgroundColor: colors.surfaceElevated, borderRadius: 14, padding: 16, gap: 12 },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 15, lineHeight: 20 },
+    aviso: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: -8 },
+    texto: { ...tipografia.bodySm, color: colors.textSecondary },
     formulario: { gap: 10 },
     estrelas: { flexDirection: "row", gap: 6 },
-    estrela: { fontSize: 26, color: colors.border },
-    estrelaAtiva: { color: colors.notaMedia },
     input: {
       backgroundColor: colors.background,
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
       color: colors.textPrimary,
+      fontFamily: "Inter_400Regular",
       fontSize: 14,
       minHeight: 44,
     },
@@ -139,7 +148,7 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
     },
     botaoDesabilitado: { opacity: 0.5 },
-    botaoSalvarTexto: { color: colors.background, fontWeight: "700", fontSize: 13 },
+    botaoSalvarTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     botaoEntrar: {
       borderRadius: 12,
       paddingVertical: 10,
@@ -147,10 +156,10 @@ function criarEstilos(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    botaoEntrarTexto: { color: colors.textSecondary, fontWeight: "600", fontSize: 13 },
+    botaoEntrarTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     avaliacao: { gap: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
-    avaliacaoHeader: { flexDirection: "row", justifyContent: "space-between" },
-    avaliacaoNota: { color: colors.notaMedia, fontSize: 13 },
-    avaliacaoData: { color: colors.textSecondary, fontSize: 11 },
+    avaliacaoHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    avaliacaoEstrelas: { flexDirection: "row", gap: 2 },
+    avaliacaoData: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 11 },
   });
 }

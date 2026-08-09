@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, Vi
 import { useRouter } from "expo-router";
 import { corDaNota, type ThemeColors } from "../src/theme";
 import { useTheme } from "../src/lib/ThemeProvider";
+import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { buscarPostosPorTexto, type PostoResultadoBusca } from "../src/lib/postos";
 import { buscarPontosRecargaPorTexto, type PontoRecargaResultadoBusca } from "../src/lib/recarga";
@@ -117,17 +118,11 @@ export default function Busca() {
         data={resultados}
         keyExtractor={(item) => `${item.tipo}-${item.dado.id}`}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <Pressable style={styles.item} onPress={() => abrirResultado(item)}>
-            <View
-              style={[
-                styles.itemMarcador,
-                {
-                  backgroundColor:
-                    item.tipo === "posto" ? corDaNota(item.dado.nota_anp, colors) : colors.eletrico,
-                },
-              ]}
-            />
+        renderItem={({ item }) => {
+          const corItem = item.tipo === "posto" ? corDaNota(item.dado.nota_anp, colors) : colors.eletrico;
+          return (
+          <Pressable style={[styles.item, { borderColor: corItem + "40" }]} onPress={() => abrirResultado(item)}>
+            <View style={[styles.itemMarcador, { backgroundColor: corItem }]} />
             <View style={styles.itemTextos}>
               <Text style={styles.itemNome} numberOfLines={1}>
                 {patrocinados.has(item.dado.id) ? "★ " : ""}
@@ -140,7 +135,8 @@ export default function Busca() {
             </View>
             <Text style={styles.itemTipo}>{item.tipo === "posto" ? "Combustível" : "Elétrico"}</Text>
           </Pressable>
-        )}
+          );
+        }}
       />
     </View>
   );
@@ -150,23 +146,27 @@ function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 14 },
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
-    titulo: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     input: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 12,
       color: colors.textPrimary,
+      fontFamily: "Inter_400Regular",
       fontSize: 15,
     },
-    texto: { color: colors.textSecondary, fontSize: 13 },
+    texto: { ...tipografia.bodySm, color: colors.textSecondary },
     erro: { color: colors.notaBaixa },
     status: { flexDirection: "row", alignItems: "center", gap: 8 },
     item: {
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
-      backgroundColor: colors.card,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,
@@ -174,8 +174,8 @@ function criarEstilos(colors: ThemeColors) {
     },
     itemMarcador: { width: 10, height: 10, borderRadius: 5 },
     itemTextos: { flex: 1, gap: 2 },
-    itemNome: { color: colors.textPrimary, fontWeight: "600", fontSize: 14 },
-    itemLocal: { color: colors.textSecondary, fontSize: 12 },
-    itemTipo: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
+    itemNome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+    itemLocal: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
+    itemTipo: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 10 },
   });
 }
