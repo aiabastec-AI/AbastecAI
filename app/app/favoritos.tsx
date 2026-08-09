@@ -74,17 +74,25 @@ export default function Favoritos() {
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
+    container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 18 },
     centralizado: { alignItems: "center", justifyContent: "center" },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
-    card: { backgroundColor: colors.surfaceElevated, borderRadius: 14, padding: 16, gap: 4 },
+    card: {
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 16,
+      padding: 18,
+      gap: 4,
+    },
     cardNome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     botaoPrimario: {
-      backgroundColor: colors.textPrimary,
-      borderRadius: 12,
-      paddingVertical: 12,
+      backgroundColor: colors.eletrico,
+      borderRadius: 14,
+      paddingVertical: 14,
       alignItems: "center",
+      boxShadow: colors.glowEletrico,
     },
     botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 14 },
   });

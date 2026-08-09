@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ThemeColors } from "../theme";
 import type { PostoProximo } from "../lib/postos";
 import type { PontoRecargaProximo } from "../lib/recarga";
@@ -12,8 +13,6 @@ function formatarDistancia(m: number): string {
   return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
-// Card do "bottom overlay" previsto no PRD original (listagem rápida de resultados
-// próximos) — fundo tintado na cor de marca por tipo, no espírito "Bento" do protótipo.
 export function CardResultadoProximo({
   item,
   colors,
@@ -31,20 +30,38 @@ export function CardResultadoProximo({
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      <Text style={styles.nome} numberOfLines={1}>
-        {patrocinado ? "★ " : ""}
-        {item.dado.nome}
-      </Text>
-      <Text style={styles.distancia}>{formatarDistancia(item.dado.distancia_m)}</Text>
-      {item.tipo === "posto" ? (
-        <Text style={styles.badge}>
-          {item.dado.nota_anp != null ? `ANP ${item.dado.nota_anp.toFixed(1)}` : "Sem nota"}
-        </Text>
-      ) : (
-        item.dado.potencia_kw != null && (
-          <Text style={styles.badge}>⚡ {item.dado.potencia_kw} kW</Text>
-        )
-      )}
+      <View style={styles.topo}>
+        <View style={styles.textos}>
+          <Text style={styles.nome} numberOfLines={1}>
+            {patrocinado ? "★ " : ""}
+            {item.dado.nome}
+          </Text>
+          <Text style={styles.local} numberOfLines={1}>
+            {item.tipo === "posto" ? "Posto de combustível" : "Ponto de recarga"}
+          </Text>
+        </View>
+        <Text style={styles.distancia}>{formatarDistancia(item.dado.distancia_m)}</Text>
+      </View>
+
+      <View style={styles.base}>
+        {item.tipo === "posto" ? (
+          <Text style={styles.badge}>
+            {item.dado.nota_anp != null ? `SCORE: ${item.dado.nota_anp.toFixed(1)}` : "SEM NOTA"}
+          </Text>
+        ) : (
+          <View style={styles.badgeEletrico}>
+            <MaterialCommunityIcons name="lightning-bolt" size={14} color={corTipo} />
+            <Text style={styles.badgeEletricoTexto}>
+              {item.dado.potencia_kw != null ? `${item.dado.potencia_kw} kW` : "RECARGA"}
+            </Text>
+          </View>
+        )}
+        <MaterialCommunityIcons
+          name={item.tipo === "posto" ? "gas-station" : "ev-station"}
+          size={30}
+          color={corTipo + "66"}
+        />
+      </View>
     </Pressable>
   );
 }
@@ -52,17 +69,34 @@ export function CardResultadoProximo({
 function criarEstilos(colors: ThemeColors, corTipo: string, glowTipo: string) {
   return StyleSheet.create({
     card: {
-      width: 170,
-      backgroundColor: corTipo + "26",
-      borderRadius: 20,
+      width: 280,
+      minHeight: 126,
+      backgroundColor: colors.surfaceGlass,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: corTipo + "55",
-      padding: 14,
-      gap: 4,
+      padding: 16,
+      justifyContent: "space-between",
       boxShadow: glowTipo,
     },
-    nome: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
-    distancia: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
-    badge: { ...tipografia.labelCaps, color: corTipo, fontSize: 11, marginTop: 4 },
+    topo: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+    textos: { flex: 1, gap: 3 },
+    nome: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 17, lineHeight: 22 },
+    local: { ...tipografia.bodySm, color: colors.textSecondary },
+    distancia: { ...tipografia.bodyMdSemiBold, color: colors.textPrimary },
+    base: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+    badge: {
+      ...tipografia.labelCaps,
+      color: corTipo,
+      fontSize: 12,
+      borderWidth: 1,
+      borderColor: corTipo + "80",
+      backgroundColor: corTipo + "22",
+      borderRadius: 6,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    badgeEletrico: { flexDirection: "row", alignItems: "center", gap: 3 },
+    badgeEletricoTexto: { ...tipografia.bodySmSemiBold, color: corTipo },
   });
 }

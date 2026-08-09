@@ -57,19 +57,20 @@ function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 16 },
     centralizador: { flex: 1, justifyContent: "center" },
-    card: { borderRadius: 20, padding: 24, gap: 12 },
+    card: { borderRadius: 20, padding: 24, gap: 14 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 22, lineHeight: 28 },
     subtitulo: { ...tipografia.bodySm, color: colors.textSecondary, marginBottom: 4 },
     aviso: { color: colors.notaBaixa, fontSize: 12 },
     botaoGoogle: {
-      backgroundColor: colors.surfaceElevated,
+      backgroundColor: colors.eletrico,
       borderRadius: 14,
       paddingVertical: 14,
       alignItems: "center",
       borderWidth: 1,
-      borderColor: colors.surfaceGlassBorder,
+      borderColor: colors.eletrico,
       marginTop: 4,
+      boxShadow: colors.glowEletrico,
     },
-    botaoGoogleTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 15 },
+    botaoGoogleTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 15 },
   });
 }

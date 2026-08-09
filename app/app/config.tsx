@@ -57,21 +57,29 @@ export default function Configuracoes() {
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 16 },
+    container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 18 },
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
-    contaCard: { backgroundColor: colors.surfaceElevated, borderRadius: 16, padding: 16, gap: 10 },
+    contaCard: {
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 16,
+      padding: 18,
+      gap: 12,
+    },
     botaoPrimario: {
-      backgroundColor: colors.textPrimary,
-      borderRadius: 12,
-      paddingVertical: 12,
+      backgroundColor: colors.eletrico,
+      borderRadius: 14,
+      paddingVertical: 14,
       alignItems: "center",
+      boxShadow: colors.glowEletrico,
     },
     botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 14 },
     botaoSecundario: {
-      borderRadius: 12,
-      paddingVertical: 10,
+      borderRadius: 14,
+      paddingVertical: 12,
       alignItems: "center",
       borderWidth: 1,
       borderColor: colors.border,

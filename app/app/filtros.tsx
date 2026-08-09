@@ -92,7 +92,7 @@ export default function Filtros() {
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: 20, gap: 24 },
+    container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 24 },
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     secao: { gap: 12 },
@@ -123,7 +123,8 @@ function criarEstilos(colors: ThemeColors) {
       borderRadius: 14,
       paddingVertical: 14,
       alignItems: "center",
-      backgroundColor: colors.textPrimary,
+      backgroundColor: colors.eletrico,
+      boxShadow: colors.glowEletrico,
     },
     botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold" },
   });

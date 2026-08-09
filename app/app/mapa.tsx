@@ -289,6 +289,16 @@ export default function MapaWebScreen() {
       </APIProvider>
 
       <View style={styles.topbar}>
+        <View style={styles.appbar}>
+          <Pressable style={styles.appbarBotao} onPress={() => router.push("/config")}>
+            <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
+          </Pressable>
+          <Text style={styles.logo}>AbastecAI</Text>
+          <Pressable style={styles.appbarBotao} onPress={() => router.push("/filtros")}>
+            <MaterialCommunityIcons name="tune-variant" size={26} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+
         <View style={styles.toggle}>
           <ToggleItem
             icone="gas-station"
@@ -321,14 +331,11 @@ export default function MapaWebScreen() {
           />
         </View>
 
-        <View style={styles.acoes}>
-          <Pressable style={styles.botaoIcone} onPress={() => router.push("/busca")}>
-            <Text style={styles.botaoIconeTexto}>Buscar</Text>
-          </Pressable>
-          <Pressable style={styles.botaoIcone} onPress={() => router.push("/filtros")}>
-            <Text style={styles.botaoIconeTexto}>Filtros</Text>
-          </Pressable>
-        </View>
+        <Pressable style={styles.buscaBarra} onPress={() => router.push("/busca")}>
+          <MaterialCommunityIcons name="magnify" size={30} color={colors.textSecondary} />
+          <Text style={styles.buscaPlaceholder}>Buscar postos ou locais...</Text>
+          <MaterialCommunityIcons name="microphone-outline" size={24} color={colors.textSecondary} />
+        </Pressable>
 
         {carregando && (
           <View style={styles.statusBadge}>
@@ -365,12 +372,12 @@ export default function MapaWebScreen() {
       <Pressable
         style={[
           styles.fab,
-          { borderColor: corDoModo(modo, colors) },
+          { borderColor: corDoModo(modo, colors), backgroundColor: corDoModo(modo, colors) },
           glowDoModo(modo, colors) ? { boxShadow: glowDoModo(modo, colors) } : null,
         ]}
         onPress={irParaMinhaLocalizacao}
       >
-        <Text style={styles.fabTexto}>📍</Text>
+        <MaterialCommunityIcons name="crosshairs-gps" size={26} color={colors.background} />
       </Pressable>
 
       {mostrarOnboarding && (
@@ -471,9 +478,17 @@ function ToggleItem({
       ]}
     >
       <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
+      <Text style={[stylesToggle.label, { color: ativo ? corIcone : "#BACAC6" }]}>{label}</Text>
     </Pressable>
   );
 }
+
+const stylesToggle = StyleSheet.create({
+  label: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+});
 
 function criarEstilos(colors: ThemeColors) {
   return StyleSheet.create({
@@ -487,7 +502,26 @@ function criarEstilos(colors: ThemeColors) {
       left: 16,
       right: 16,
       maxWidth: 480,
-      gap: 10,
+      gap: 12,
+    },
+    appbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 2,
+    },
+    appbarBotao: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    logo: {
+      fontFamily: "SpaceGrotesk_700Bold",
+      fontSize: 34,
+      lineHeight: 40,
+      color: colors.eletrico,
     },
     toggle: {
       flexDirection: "row",
@@ -500,21 +534,25 @@ function criarEstilos(colors: ThemeColors) {
     },
     toggleItem: {
       flex: 1,
+      flexDirection: "row",
+      gap: 6,
       paddingVertical: 10,
       borderRadius: 16,
       alignItems: "center",
+      justifyContent: "center",
     },
-    acoes: { flexDirection: "row", gap: 10 },
-    botaoIcone: {
-      flex: 1,
+    buscaBarra: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
       backgroundColor: colors.surfaceGlass,
       borderWidth: 1,
       borderColor: colors.surfaceGlassBorder,
-      borderRadius: 14,
-      paddingVertical: 10,
-      alignItems: "center",
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
     },
-    botaoIconeTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+    buscaPlaceholder: { flex: 1, color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 17 },
     statusBadge: {
       flexDirection: "row",
       alignItems: "center",
@@ -541,7 +579,6 @@ function criarEstilos(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "center",
     },
-    fabTexto: { fontSize: 22 },
     listaProximos: {
       position: "absolute",
       left: 0,
