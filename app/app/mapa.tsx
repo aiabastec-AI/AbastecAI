@@ -111,6 +111,9 @@ export default function MapaWebScreen() {
   // Um só painel lateral esquerdo por vez (busca+filtros ou configurações) — nunca os dois
   // juntos, então um estado com as duas opções em vez de dois booleanos independentes.
   const [painelEsquerdo, setPainelEsquerdo] = useState<"busca" | "config" | null>(null);
+  // A lista horizontal de cards embaixo só aparece clicando na alça — não é mais aberta ao
+  // clicar num pin (isso já abre o painel de detalhe à direita, que é o suficiente).
+  const [mostrarListaProximos, setMostrarListaProximos] = useState(false);
 
   // Última localização real do usuário — usada como origem da rota (o botão "Traçar rota"
   // desenha no próprio mapa em vez de abrir o Google Maps externo) E pra desenhar o marcador
@@ -481,23 +484,42 @@ export default function MapaWebScreen() {
         </View>
       </View>
 
-      {!mostrarOnboarding && selecionado && resultadosProximos.length > 0 && (
-        <FlatList
-          style={styles.listaProximos}
-          contentContainerStyle={styles.listaProximosConteudo}
-          data={resultadosProximos}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => `${item.tipo}-${item.dado.id}`}
-          renderItem={({ item }) => (
-            <CardResultadoProximo
-              item={item}
-              colors={colors}
-              patrocinado={patrocinados.has(item.dado.id)}
-              onPress={() => setSelecionado({ tipo: item.tipo, id: item.dado.id })}
+      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+        <>
+          {mostrarListaProximos && (
+            <FlatList
+              style={styles.listaProximos}
+              contentContainerStyle={styles.listaProximosConteudo}
+              data={resultadosProximos}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => `${item.tipo}-${item.dado.id}`}
+              renderItem={({ item }) => (
+                <CardResultadoProximo
+                  item={item}
+                  colors={colors}
+                  patrocinado={patrocinados.has(item.dado.id)}
+                  onPress={() => setSelecionado({ tipo: item.tipo, id: item.dado.id })}
+                />
+              )}
             />
           )}
-        />
+          <Pressable
+            style={styles.alcaLista}
+            onPress={() => setMostrarListaProximos((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={mostrarListaProximos ? "Esconder lista de próximos" : "Ver lista de próximos"}
+          >
+            <MaterialCommunityIcons
+              name={mostrarListaProximos ? "chevron-down" : "chevron-up"}
+              size={18}
+              color={colors.textPrimary}
+            />
+            <Text style={styles.alcaListaTexto}>
+              {resultadosProximos.length} por perto
+            </Text>
+          </Pressable>
+        </>
       )}
 
       <Pressable
@@ -1125,12 +1147,30 @@ function criarEstilos(colors: ThemeColors) {
       position: "absolute",
       left: 0,
       right: 0,
-      bottom: 24,
+      bottom: 76,
     },
     listaProximosConteudo: {
       paddingHorizontal: 16,
       gap: 12,
     },
+    alcaLista: {
+      position: "absolute",
+      left: "50%",
+      marginLeft: -75,
+      bottom: 24,
+      width: 150,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    alcaListaTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     onboardingOverlay: {
       position: "absolute",
       top: 0,
