@@ -47,3 +47,21 @@ export function criarIconePin(
     anchor: { x: centro, y: altura } as google.maps.Point,
   };
 }
+
+// O ponto azul "você está aqui" — o Google Maps JS não desenha isso sozinho (diferente do
+// SDK nativo, que tem showsUserLocation pronto), então é só mais um Marker com esse ícone.
+// Halo translúcido + bolinha sólida com borda branca, igual ao indicador clássico do Google
+// Maps/Waze — âncora no centro (sem haste, é um ponto no mapa, não um pin apontando algo).
+export function criarIconeLocalizacao(): google.maps.Icon {
+  const diametro = 22;
+  const centro = diametro / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${diametro}" height="${diametro}">
+    <circle cx="${centro}" cy="${centro}" r="${centro}" fill="#4285F4" fill-opacity="0.25" />
+    <circle cx="${centro}" cy="${centro}" r="${centro - 6}" fill="#4285F4" stroke="#FFFFFF" stroke-width="2.5" />
+  </svg>`;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: { width: diametro, height: diametro } as google.maps.Size,
+    anchor: { x: centro, y: centro } as google.maps.Point,
+  };
+}

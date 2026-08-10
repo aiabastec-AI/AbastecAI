@@ -28,7 +28,7 @@ import { corDaNota, corDoModo, glowDoModo, type ModoMapa, type ThemeColors } fro
 import { useTheme } from "../src/lib/ThemeProvider";
 import { tipografia } from "../src/typography";
 import { estiloMapaClaro, estiloMapaEscuro } from "../src/lib/googleMapStyle";
-import { criarIconePin } from "../src/lib/pinSvg";
+import { criarIconePin, criarIconeLocalizacao } from "../src/lib/pinSvg";
 import {
   buscarPostosProximos,
   buscarPostosPorTexto,
@@ -113,13 +113,22 @@ export default function MapaWebScreen() {
   const [painelEsquerdo, setPainelEsquerdo] = useState<"busca" | "config" | null>(null);
 
   // Última localização real do usuário — usada como origem da rota (o botão "Traçar rota"
-  // desenha no próprio mapa em vez de abrir o Google Maps externo). Guardado num ref (não
-  // precisa re-renderizar quando muda) e atualizado toda vez que conseguimos um fix de GPS
-  // em qualquer um dos fluxos que já pedem localização (onboarding, botão de "minha localização").
+  // desenha no próprio mapa em vez de abrir o Google Maps externo) E pra desenhar o marcador
+  // "você está aqui" no mapa web (diferente do nativo, o Google Maps JS não desenha esse ponto
+  // sozinho — precisa de um <Marker> nosso). Ref porque `aoTracarRota` precisa ler o valor mais
+  // recente sem esperar um re-render; state porque o marcador em si precisa re-renderizar.
   const minhaLocalizacaoRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [minhaLocalizacao, setMinhaLocalizacaoState] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
   const [rotaDestino, setRotaDestino] = useState<{ lat: number; lng: number } | null>(null);
   const [rotaOrigem, setRotaOrigem] = useState<{ lat: number; lng: number } | null>(null);
   const [calculandoRota, setCalculandoRota] = useState(false);
+
+  function definirMinhaLocalizacao(coords: { lat: number; lng: number }) {
+    minhaLocalizacaoRef.current = coords;
+    setMinhaLocalizacaoState(coords);
+  }
 
   async function aoTracarRota(destino: { lat: number; lng: number }) {
     if (!minhaLocalizacaoRef.current) {
@@ -130,10 +139,10 @@ export default function MapaWebScreen() {
           return;
         }
         const posicao = await Location.getCurrentPositionAsync({});
-        minhaLocalizacaoRef.current = {
+        definirMinhaLocalizacao({
           lat: posicao.coords.latitude,
           lng: posicao.coords.longitude,
-        };
+        });
       } catch (e) {
         const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
         setErro(mensagem);
@@ -198,7 +207,7 @@ export default function MapaWebScreen() {
       if (status === Location.PermissionStatus.GRANTED) {
         try {
           const posicao = await Location.getCurrentPositionAsync({});
-          minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
+          definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
           irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
         } catch {
           // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
@@ -218,7 +227,7 @@ export default function MapaWebScreen() {
         return;
       }
       const posicao = await Location.getCurrentPositionAsync({});
-      minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
+      definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
     } catch (e) {
       const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
@@ -235,7 +244,7 @@ export default function MapaWebScreen() {
       }
       setMostrarOnboarding(false);
       const posicao = await Location.getCurrentPositionAsync({});
-      minhaLocalizacaoRef.current = { lat: posicao.coords.latitude, lng: posicao.coords.longitude };
+      definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
     } catch {
       // Falha ao obter posição (GPS indisponível, timeout etc.) — mesma mensagem da negação
@@ -374,6 +383,14 @@ export default function MapaWebScreen() {
                 setCalculandoRota(false);
                 if (!sucesso) setErro("Não foi possível calcular a rota.");
               }}
+            />
+          )}
+          {minhaLocalizacao && (
+            <Marker
+              position={minhaLocalizacao}
+              icon={criarIconeLocalizacao()}
+              zIndex={1000}
+              clickable={false}
             />
           )}
         </Map>
