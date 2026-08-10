@@ -449,8 +449,33 @@ Causa raiz, achada só depois de descartar várias hipóteses erradas (ícone de
 
 `FichaPosto`: mostra só as 2 primeiras fiscalizações por padrão, com um "Ver mais N" que expande a lista completa — evita a ficha ficar poluída em postos com histórico longo.
 
-### 15.5 O que ficou pra depois (pedido explícito do usuário, escopo grande)
+### 15.5 Preços colaborativos
 
-- [ ] **Preços colaborativos** — usuários sugerindo o preço do combustível em cada posto, mostrado no card/ficha. Precisa de tabela nova + RLS + UI, seguindo o mesmo padrão de `avaliacoes_usuario`.
-- [ ] **Mesma experiência (pins redondos, rota in-app) no app nativo** — hoje só a web tem os pins redondos com nota e a rota desenhada dentro do app; nativo (`app/index.tsx`, `posto/[id].tsx`/`recarga/[id].tsx` fora do painel web) continua com o link externo do Google Maps.
-- [ ] Card com foto do posto — pedido pelo usuário, mas não existe fonte de dado real pra isso (ANP não fornece fotos); ficou de fora até decidir se é foto de usuário, stock genérico, ou outra fonte.
+Migration `20260809160000_precos_colaborativos.sql`: tabela `precos_combustivel` (`posto_id`, `usuario_id`, `tipo_combustivel` — gasolina/etanol/diesel/gnv —, `preco`, `created_at`). **Diferente de `avaliacoes_usuario`**: cada envio é uma linha nova, sem upsert — é histórico de preço de verdade (muda com frequência), não "a opinião atual de cada usuário". RLS: leitura pública, insert só do próprio `usuario_id` (mesmo padrão de `auth_id = auth.uid()` das outras tabelas de usuário).
+
+`src/lib/precos.ts` busca as últimas 20 linhas do posto e fica só com a mais recente de cada tipo de combustível (client-side, evita precisar de `distinct on` via RPC). `SecaoPrecos.tsx` espelha o `SecaoAvaliacoes.tsx` (chips com o preço mais recente por tipo; se logado, seletor de combustível + campo de valor pra reportar um novo). Só em `FichaPosto` — `pontos_recarga` não tem conceito de preço no schema atual.
+
+### 15.6 Marcador "você está aqui" no mapa web
+
+`@vis.gl/react-google-maps` não desenha esse ponto sozinho (diferente do nativo, que tem `showsUserLocation`/`<Mapbox.UserLocation>` prontos). Toda vez que já pegávamos um fix de GPS (onboarding, botão de localização, checagem silenciosa no mount, origem da rota) só usava pra centralizar a câmera — agora também atualiza um `state` (`minhaLocalizacao`, par do `ref` que já existia pra leitura síncrona em `aoTracarRota`) que renderiza um `<Marker>` com `criarIconeLocalizacao()` (`pinSvg.ts`) — halo translúcido + bolinha azul com borda branca, visual clássico de "blue dot".
+
+### 15.7 Card de resultado próximo e lista sob demanda
+
+- `CardResultadoProximo.tsx`: a nota (ou raio, pro elétrico) agora vem dentro de um círculo com anel colorido — mesmo desenho do pin do mapa (`corDaNota`), no lugar do badge retangular "SCORE: X.X" antigo.
+- A lista horizontal de cards embaixo do mapa **não abre mais sozinha ao clicar num pin** (isso já abre o painel de detalhe à direita, é redundante mostrar as duas coisas). Agora só abre/fecha por uma alça fixa ("N por perto") — estado `mostrarListaProximos`, independente de `selecionado`.
+
+### 15.8 Investigação de cobertura de dados — recarga elétrica em Araraquara (pedido do usuário)
+
+Usuário reportou pontos de recarga reais faltando (concessionária GWM, um na Av. 36, Shopping Jaraguá). Investigado consultando o banco **e** a Open Charge Map direto (`curl` na API deles, não só inferindo):
+
+- Temos 3 pontos num raio de 15km do centro de Araraquara, todos vindos da OCM: Petrobras Flora de Araraquara, Posto BR - Pau Seco (Rodovia Washington Luís — provavelmente o "SAU da rodovia" mencionado) e BYD Aliança.
+- **BYD Aliança está no banco mas com `cidade = null`** (a própria OCM manda o campo `Town` vazio pra esse POI) — aparece no mapa normal (busca é por raio geoespacial, não por nome de cidade), mas não aparece numa busca por texto "Araraquara". **Achado mais amplo**: **106 de ~1607 pontos de recarga no Brasil inteiro têm `cidade` nulo** por esse mesmo motivo — pendência real, ainda não corrigida (proposta: preencher via geocoding reverso, ou aceitar como limitação conhecida).
+- GWM, Av. 36 e Shopping Jaraguá **não existem na Open Charge Map** — confirmado direto na fonte, não é bug nosso. É uma base colaborativa (tipo Waze/OSM), cobertura varia muito por cidade, mais fraca em cidades médias do interior. Sync rodou hoje de manhã (`ultima_sincronizacao`), então o que temos está atualizado com o que a OCM tem — a lacuna é upstream.
+- **Perguntado ao usuário, ainda sem resposta**: (1) corrigir os 106 pontos com cidade nula? (2) cadastrar manualmente esses pontos que faltam, fora do fluxo de sync automático (que os sobrescreveria/normalizaria diferente)?
+
+### 15.9 O que ficou pra depois
+
+- [ ] **Mesma experiência (pins redondos, rota in-app, blue dot) no app nativo** — hoje só a web tem isso; nativo (`app/index.tsx`, rotas cheias de `posto/[id].tsx`/`recarga/[id].tsx`) continua com o link externo do Google Maps e sem indicador de localização customizado (o Mapbox antigo tinha, o `react-native-maps` atual não foi configurado com `showsUserLocation` ainda — checar).
+- [ ] Card com foto do posto — pedido pelo usuário, mas não existe fonte de dado real pra isso (ANP não fornece fotos). Descartada a opção de raspar Google Maps (viola ToS deles, risco real pra conta do GCP que o Maps/Directions inteiro depende). Alternativa proposta: foto enviada pelos próprios usuários, mesmo espírito dos preços colaborativos — ainda não implementada.
+- [ ] 106 pontos de recarga com `cidade` nula (ver 15.8) — corrigir ou aceitar como limitação conhecida.
+- [ ] Cadastro manual dos pontos de recarga de Araraquara que faltam na OCM (ver 15.8).
