@@ -66,6 +66,12 @@ module.exports = {
       supabaseUrl: process.env.SUPABASE_URL,
       supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
       googleMapsWebApiKey: process.env.GOOGLE_MAPS_WEB_API_KEY,
+      // Mesmas chaves restritas por app (package/SHA-1 no Android, bundle ID no iOS) já
+      // embutidas no binário nativo pelo plugin react-native-maps acima — expor aqui só
+      // permite ler o mesmo valor em runtime pra chamar a Directions REST API (rota in-app),
+      // sem aumentar a exposição real do segredo.
+      googleMapsAndroidApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
+      googleMapsIosApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
     },
   },
 };

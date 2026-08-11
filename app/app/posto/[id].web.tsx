@@ -1,51 +1,41 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Location from "expo-location";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { corDaNota, glowDaNota, type ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
 import { tipografia } from "../../src/typography";
-import { estiloMapaClaro, estiloMapaEscuro } from "../../src/lib/googleMapStyle";
 import {
   buscarHistoricoFiscalizacao,
   buscarPostoPorId,
   type HistoricoFiscalizacao,
   type PostoDetalhe,
 } from "../../src/lib/postos";
-import { buscarRota, type RotaCalculada } from "../../src/lib/rotas";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
-import { SecaoPrecos } from "../../src/components/SecaoPrecos";
 import { AnelNota } from "../../src/components/AnelNota";
-import { PinMapa } from "../../src/components/PinMapa";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
+// Contraparte ".web.tsx" de posto/[id].tsx — o Expo Router prioriza este arquivo no build
+// web (mesmo mecanismo de index.web.tsx/mapa.tsx). Existe só porque a versão nativa passou
+// a usar `react-native-maps` (MapView real com a rota desenhada), que não roda em navegador
+// (mesmo motivo documentado no ARQUITETURA.md pra separar mapa.tsx de index.tsx). Quem cai
+// direto num link /posto/:id na web usa este fallback: cabeçalho decorativo + link externo
+// pro Google Maps, igual ao comportamento de antes da rota in-app existir.
 const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: [] };
-const HISTORICO_VISIVEL_INICIAL = 2;
 
 export default function FichaPosto() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors, modo: modoTema } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
-  const mapRef = useRef<MapView | null>(null);
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [historico, setHistorico] = useState<HistoricoFiscalizacao>(HISTORICO_VAZIO);
-  const [historicoExpandido, setHistoricoExpandido] = useState(false);
   const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [rota, setRota] = useState<RotaCalculada | null>(null);
-  const [calculandoRota, setCalculandoRota] = useState(false);
-  const [erroRota, setErroRota] = useState<string | null>(null);
-  const [mostrarMinhaLocalizacao, setMostrarMinhaLocalizacao] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    setRota(null);
-    setErroRota(null);
-    setHistoricoExpandido(false);
     buscarPostoPorId(id)
       .then(setPosto)
       .catch((e) => setErro(e instanceof Error ? e.message : "Falha ao carregar posto."));
@@ -99,65 +89,20 @@ export default function FichaPosto() {
     : null;
   const corNota = corDaNota(posto.nota_anp, colors);
 
-  async function aoTracarRota() {
-    if (calculandoRota) return;
-    setErroRota(null);
-    setCalculandoRota(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setErroRota("Preciso da sua localização pra traçar a rota.");
-        return;
-      }
-      const posicao = await Location.getCurrentPositionAsync({});
-      setMostrarMinhaLocalizacao(true);
-      const resultado = await buscarRota(
-        { lat: posicao.coords.latitude, lng: posicao.coords.longitude },
-        { lat: posto!.latitude, lng: posto!.longitude }
-      );
-      if (!resultado) {
-        setErroRota("Não consegui calcular a rota agora.");
-        return;
-      }
-      setRota(resultado);
-      mapRef.current?.fitToCoordinates(resultado.coordenadas, {
-        edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-        animated: true,
-      });
-    } catch (e) {
-      setErroRota((e as { message?: string })?.message || "Não foi possível traçar a rota.");
-    } finally {
-      setCalculandoRota(false);
-    }
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.mapaFundo}>
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          provider={PROVIDER_GOOGLE}
-          customMapStyle={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
-          initialRegion={{
-            latitude: posto.latitude,
-            longitude: posto.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }}
-          showsUserLocation={mostrarMinhaLocalizacao}
-          showsMyLocationButton={false}
-        >
-          <Marker
-            coordinate={{ latitude: posto.latitude, longitude: posto.longitude }}
-            tracksViewChanges={false}
-          >
-            <PinMapa cor={corNota} patrocinado={patrocinado} tipo="posto" nota={posto.nota_anp} />
-          </Marker>
-          {rota && (
-            <Polyline coordinates={rota.coordenadas} strokeColor={colors.eletrico} strokeWidth={4} />
-          )}
-        </MapView>
+        <View style={styles.gradeMapa} />
+        <View style={styles.pinAtivo}>
+          <View style={[styles.pinCirculo, { borderColor: corNota, boxShadow: glowDaNota(posto.nota_anp, colors) ?? colors.glowCombustivel }]}>
+            {posto.nota_anp != null ? (
+              <Text style={[styles.pinNota, { color: corNota }]}>{posto.nota_anp.toFixed(1)}</Text>
+            ) : (
+              <MaterialCommunityIcons name="gas-station" size={30} color={corNota} />
+            )}
+          </View>
+          <View style={[styles.pinHaste, { backgroundColor: corNota }]} />
+        </View>
         <View style={styles.voltarFlutuante}>
           <BotaoVoltar />
         </View>
@@ -198,30 +143,13 @@ export default function FichaPosto() {
 
         <View style={styles.acoesLinha}>
           {mapsUrl && (
-            <Pressable style={styles.botaoPrimario} disabled={calculandoRota} onPress={aoTracarRota}>
-              {calculandoRota ? (
-                <ActivityIndicator color={colors.background} size="small" />
-              ) : (
-                <MaterialCommunityIcons name="car" size={21} color={colors.background} />
-              )}
-              <Text style={styles.botaoPrimarioTexto}>
-                {rota ? `${rota.distanciaTexto} · ${rota.duracaoTexto}` : "Traçar rota"}
-              </Text>
+            <Pressable style={styles.botaoPrimario} onPress={() => Linking.openURL(mapsUrl)}>
+              <MaterialCommunityIcons name="car" size={21} color={colors.background} />
+              <Text style={styles.botaoPrimarioTexto}>Traçar rota</Text>
             </Pressable>
           )}
           <BotaoFavorito alvo={{ tipo: "posto", id: posto.id }} />
         </View>
-
-        {erroRota && (
-          <View style={styles.erroRotaLinha}>
-            <Text style={styles.erroRotaTexto}>{erroRota}</Text>
-            {mapsUrl && (
-              <Pressable onPress={() => Linking.openURL(mapsUrl)}>
-                <Text style={styles.erroRotaLink}>Abrir no Google Maps</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
 
         <View style={styles.infoCard}>
           {endereco && (
@@ -262,10 +190,7 @@ export default function FichaPosto() {
                   <Text style={styles.resumoNumero}>{totalAmostrasNaoConformes}</Text>
                   <Text style={styles.resumoLabel}>amostras não conformes</Text>
                 </View>
-                {(historicoExpandido
-                  ? historico.fiscalizacoes
-                  : historico.fiscalizacoes.slice(0, HISTORICO_VISIVEL_INICIAL)
-                ).map((f) => (
+                {historico.fiscalizacoes.slice(0, 4).map((f) => (
                   <View key={f.id} style={styles.registroHistorico}>
                     <View style={styles.registroTextos}>
                       <Text style={styles.registroTitulo}>
@@ -281,19 +206,10 @@ export default function FichaPosto() {
                     </Text>
                   </View>
                 ))}
-                {!historicoExpandido && historico.fiscalizacoes.length > HISTORICO_VISIVEL_INICIAL && (
-                  <Pressable onPress={() => setHistoricoExpandido(true)}>
-                    <Text style={styles.verMaisTexto}>
-                      Ver mais {historico.fiscalizacoes.length - HISTORICO_VISIVEL_INICIAL}
-                    </Text>
-                  </Pressable>
-                )}
               </>
             )}
           </View>
         </View>
-
-        <SecaoPrecos postoId={posto.id} />
 
         <Pressable
           style={styles.botaoSecundario}
@@ -345,11 +261,26 @@ function criarEstilos(colors: ThemeColors) {
         borderBottomWidth: 1,
         borderBottomColor: colors.surfaceGlassBorder,
       },
+      gradeMapa: {
+        ...StyleSheet.absoluteFill,
+        opacity: 0.5,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.surfaceGlassBorder,
+      },
+      pinAtivo: { position: "absolute", top: 96, alignSelf: "center", alignItems: "center" },
+      pinCirculo: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: colors.card,
+        borderWidth: 3,
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      pinNota: { fontFamily: "SpaceGrotesk_600SemiBold", fontSize: 22 },
+      pinHaste: { width: 6, height: 36, borderRadius: 3 },
       voltarFlutuante: { position: "absolute", top: 24, left: 20 },
-      erroRotaLinha: { marginTop: -12, gap: 4 },
-      erroRotaTexto: { ...tipografia.bodySm, color: colors.notaBaixa },
-      erroRotaLink: { color: colors.eletrico, fontFamily: "Inter_600SemiBold", fontSize: 13 },
-      verMaisTexto: { color: colors.eletrico, fontFamily: "Inter_600SemiBold", fontSize: 13, marginTop: 2 },
       sheet: {
         flex: 1,
         marginTop: -24,

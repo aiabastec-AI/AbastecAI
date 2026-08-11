@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Location from "expo-location";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import type { ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
 import { tipografia } from "../../src/typography";
-import { estiloMapaClaro, estiloMapaEscuro } from "../../src/lib/googleMapStyle";
 import { buscarPontoRecargaPorId, type PontoRecargaDetalhe } from "../../src/lib/recarga";
-import { buscarRota, type RotaCalculada } from "../../src/lib/rotas";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
-import { PinMapa } from "../../src/components/PinMapa";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
+// Contraparte ".web.tsx" de recarga/[id].tsx — ver comentário equivalente em
+// posto/[id].web.tsx: existe só porque a versão nativa passou a usar `react-native-maps`
+// (não roda em navegador), e este arquivo é o fallback pra quem cai direto num link
+// /recarga/:id na web (cabeçalho decorativo + link externo, igual ao comportamento de
+// antes da rota in-app existir).
 function iconeConector(tipo: string): ComponentProps<typeof MaterialCommunityIcons>["name"] {
   const t = tipo.toLowerCase();
   if (t.includes("chademo")) return "ev-plug-chademo";
@@ -32,21 +32,14 @@ function statusRecarga(status: string | null): { texto: string; cor: keyof Theme
 
 export default function FichaRecarga() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors, modo: modoTema } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
-  const mapRef = useRef<MapView | null>(null);
   const [ponto, setPonto] = useState<PontoRecargaDetalhe | null | undefined>(undefined);
   const [patrocinado, setPatrocinado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [rota, setRota] = useState<RotaCalculada | null>(null);
-  const [calculandoRota, setCalculandoRota] = useState(false);
-  const [erroRota, setErroRota] = useState<string | null>(null);
-  const [mostrarMinhaLocalizacao, setMostrarMinhaLocalizacao] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    setRota(null);
-    setErroRota(null);
     buscarPontoRecargaPorId(id)
       .then(setPonto)
       .catch((e) => setErro(e instanceof Error ? e.message : "Falha ao carregar ponto de recarga."));
@@ -91,65 +84,16 @@ export default function FichaRecarga() {
   const status = statusRecarga(ponto.status);
   const corStatus = colors[status.cor];
 
-  async function aoTracarRota() {
-    if (calculandoRota) return;
-    setErroRota(null);
-    setCalculandoRota(true);
-    try {
-      const { status: statusPermissao } = await Location.requestForegroundPermissionsAsync();
-      if (statusPermissao !== "granted") {
-        setErroRota("Preciso da sua localização pra traçar a rota.");
-        return;
-      }
-      const posicao = await Location.getCurrentPositionAsync({});
-      setMostrarMinhaLocalizacao(true);
-      const resultado = await buscarRota(
-        { lat: posicao.coords.latitude, lng: posicao.coords.longitude },
-        { lat: ponto!.latitude, lng: ponto!.longitude }
-      );
-      if (!resultado) {
-        setErroRota("Não consegui calcular a rota agora.");
-        return;
-      }
-      setRota(resultado);
-      mapRef.current?.fitToCoordinates(resultado.coordenadas, {
-        edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-        animated: true,
-      });
-    } catch (e) {
-      setErroRota((e as { message?: string })?.message || "Não foi possível traçar a rota.");
-    } finally {
-      setCalculandoRota(false);
-    }
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.mapaFundo}>
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          provider={PROVIDER_GOOGLE}
-          customMapStyle={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
-          initialRegion={{
-            latitude: ponto.latitude,
-            longitude: ponto.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }}
-          showsUserLocation={mostrarMinhaLocalizacao}
-          showsMyLocationButton={false}
-        >
-          <Marker
-            coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-            tracksViewChanges={false}
-          >
-            <PinMapa cor={colors.eletrico} patrocinado={patrocinado} tipo="recarga" />
-          </Marker>
-          {rota && (
-            <Polyline coordinates={rota.coordenadas} strokeColor={colors.eletrico} strokeWidth={4} />
-          )}
-        </MapView>
+        <View style={styles.gradeMapa} />
+        <View style={styles.pinAtivo}>
+          <View style={styles.pinCirculo}>
+            <MaterialCommunityIcons name="lightning-bolt" size={34} color={colors.eletrico} />
+          </View>
+          <View style={styles.pinHaste} />
+        </View>
         <View style={styles.voltarFlutuante}>
           <BotaoVoltar />
         </View>
@@ -241,30 +185,13 @@ export default function FichaRecarga() {
 
         <View style={styles.acoesLinha}>
           {mapsUrl && (
-            <Pressable style={styles.botaoPrimario} disabled={calculandoRota} onPress={aoTracarRota}>
-              {calculandoRota ? (
-                <ActivityIndicator color={colors.background} size="small" />
-              ) : (
-                <MaterialCommunityIcons name="directions" size={22} color={colors.background} />
-              )}
-              <Text style={styles.botaoPrimarioTexto}>
-                {rota ? `${rota.distanciaTexto} · ${rota.duracaoTexto}` : "Traçar rota"}
-              </Text>
+            <Pressable style={styles.botaoPrimario} onPress={() => Linking.openURL(mapsUrl)}>
+              <MaterialCommunityIcons name="directions" size={22} color={colors.background} />
+              <Text style={styles.botaoPrimarioTexto}>Traçar rota</Text>
             </Pressable>
           )}
           <BotaoFavorito alvo={{ tipo: "recarga", id: ponto.id }} />
         </View>
-
-        {erroRota && (
-          <View style={styles.erroRotaLinha}>
-            <Text style={styles.erroRotaTexto}>{erroRota}</Text>
-            {mapsUrl && (
-              <Pressable onPress={() => Linking.openURL(mapsUrl)}>
-                <Text style={styles.erroRotaLink}>Abrir no Google Maps</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
 
         <SecaoAvaliacoes alvo={{ tipo: "recarga", id: ponto.id }} />
       </ScrollView>
@@ -308,10 +235,27 @@ function criarEstilos(colors: ThemeColors) {
       borderBottomWidth: 1,
       borderBottomColor: colors.surfaceGlassBorder,
     },
+    gradeMapa: {
+      ...StyleSheet.absoluteFill,
+      opacity: 0.45,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+    },
+    pinAtivo: { position: "absolute", top: 116, alignSelf: "center", alignItems: "center" },
+    pinCirculo: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: colors.card,
+      borderWidth: 3,
+      borderColor: colors.eletrico,
+      alignItems: "center",
+      justifyContent: "center",
+      boxShadow: colors.glowEletrico,
+    },
+    pinHaste: { width: 6, height: 42, backgroundColor: colors.eletrico, borderRadius: 3 },
     voltarFlutuante: { position: "absolute", top: 24, left: 20 },
-    erroRotaLinha: { marginTop: -12, gap: 4 },
-    erroRotaTexto: { ...tipografia.bodySm, color: colors.notaBaixa },
-    erroRotaLink: { color: colors.eletrico, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     sheet: {
       flex: 1,
       marginTop: -28,
