@@ -2,6 +2,16 @@
 
 Nota rápida pra mim mesmo (Claude) na próxima sessão. `ARQUITETURA.md` é a fonte permanente de verdade (seções 14 e 15 têm o detalhe técnico completo do que foi feito hoje) — este arquivo aqui é só um resumo de trabalho, sempre confira o `ARQUITETURA.md` pro detalhe real.
 
+## Atualização — 2026-08-11 (rota in-app no nativo)
+
+Pedido do usuário: comparar o mapa nativo com o web e portar o que faltasse. Achado (ver ARQUITETURA.md 15.9): pins redondos e blue dot **já estavam OK** no nativo (a suposição de que faltavam era desatualizada); só a rota in-app faltava de verdade. Implementado (detalhe técnico completo em ARQUITETURA.md 15.10/15.11):
+
+- `posto/[id].tsx`/`recarga/[id].tsx` ganharam um `MapView` de verdade no cabeçalho (antes decorativo) com a rota desenhada via Directions REST API (`src/lib/rotas.ts`, novo — decodifica polyline na mão, sem lib nova).
+- De brinde, descoberto que essas telas nunca usaram os componentes compartilhados `FichaPosto.tsx`/`FichaRecarga.tsx` (são bespoke) — por isso preços colaborativos e histórico progressivo nunca chegaram no nativo. Corrigido importando `SecaoPrecos` e a lógica de "ver mais" direto nas telas nativas, mantendo a casca visual própria (não trocado pelo componente flat do web).
+- **Efeito colateral pego a tempo**: `react-native-maps` não roda em navegador — como essas telas não tinham `.web.tsx` (nunca precisaram antes), o `MapView` novo ia quebrar quem acessa `/posto/:id`/`/recarga/:id` direto pela versão web. Criados `posto/[id].web.tsx`/`recarga/[id].web.tsx` com o comportamento antigo como fallback, mesmo padrão de `index.web.tsx`.
+- **Resolvido ainda nesta sessão**: a Directions API não estava habilitada nos `apiTargets` das chaves Android/iOS. `gcloud` não autenticava por causa do Avast — usuário desativou o Avast Shields temporariamente e o comando (`gcloud services api-keys update`) rodou certo pras duas chaves. Validado com `curl` direto na Directions REST API (chave Android + headers `X-Android-Package`/`X-Android-Cert`) — voltou rota `OK`.
+- **Testado de ponta a ponta no emulador Android** (`medium_phone`): build + install manual, Metro + `adb reverse`, abriu a ficha de um ponto de recarga com `MapView` real, apertou "Traçar rota" e a rota foi calculada e desenhada de verdade (linha no mapa, câmera ajustada, "1,0 mi · 5 minutos" no botão). Sem crash. Só não testei a ficha de posto de combustível na mesma passada (sem postos no banco perto de Mountain View, localização padrão do emulador) — mas é o mesmo código.
+
 ## O que foi feito hoje
 
 **1. Login Google** (código + credenciais, ver seção 14.6):
@@ -26,6 +36,7 @@ Nota rápida pra mim mesmo (Claude) na próxima sessão. `ARQUITETURA.md` é a f
 4. **Chaves de API do Google Maps são restritas por serviço** (`apiTargets`) além de restritas por app/domínio — habilitar uma API nova no projeto GCP **não é suficiente**, precisa também adicionar o serviço na lista de `apiTargets` da chave específica que vai usar (aconteceu com a Directions API na chave web). Ver seção 14.1/15.3 do `ARQUITETURA.md`.
 5. **Vercel CLI (`vercel whoami` etc.) e comandos MCP genéricos funcionam bem; chamadas cruas via `curl` pra `api.supabase.com`/`api.vercel.com` no Windows têm fricção real com paths** (`/tmp` não existe, `node -e` com paths Unix-style falha) — mais confiável escrever o payload JSON com a ferramenta `Write` direto num arquivo do scratchpad e referenciar com `@caminho` no `curl -d`.
 6. **Testar mudanças no mapa web sempre com Playwright de verdade** (não confiar só em `tsc`/leitura de código) — nesta sessão, pelo menos 2 bugs reais (crash do `Size`, snap-back do drag) só foram encontrados testando de verdade contra o site publicado, e uma "confirmação" inicial do drag funcionando foi falso positivo (o clique caiu numa área vazia por coincidência) — sempre comparar rótulos de rua/pins visíveis antes/depois, não só "não deu erro".
+7. **`react-native-maps` não roda em navegador** (por isso `mapa.tsx` existe separado de `index.tsx`, ver ARQUITETURA.md 14.1) — qualquer arquivo dentro de `app/app/` que importe `react-native-maps`/`react-native-map-clustering` direto precisa de um `.web.tsx` irmão (Expo Router prioriza esse sufixo no build web), senão quem acessa aquela rota pela versão web quebra em runtime. `npx expo export -p web` **não acusa esse erro** (bundling não executa o código) — só aparece rodando de verdade no navegador.
 
 ## O que falta (bloqueado no usuário — perguntas feitas, sem resposta ainda)
 
@@ -36,9 +47,10 @@ Nota rápida pra mim mesmo (Claude) na próxima sessão. `ARQUITETURA.md` é a f
 
 ## O que falta (dá pra eu fazer sozinho, se pedirem)
 
-- Levar pins redondos + rota in-app + blue dot pro app **nativo** (hoje só a versão web tem) — maior escopo, envolve `react-native-maps`/`PinMapa.tsx`/telas cheias de posto/recarga.
+- Testar a rota in-app na ficha de **posto de combustível** (só a de recarga foi validada nesta sessão — mesmo código, mas ainda não confirmado visualmente).
 - Feature de foto enviada por usuário (se o usuário confirmar que quer essa via).
-- Push notifications de verdade, confirmação de e-mail (isso último ficou sem sentido agora que só tem login Google — provavelmente pode ser риscado da lista de pendências).
+- Push notifications de verdade, confirmação de e-mail (isso último ficou sem sentido agora que só tem login Google — provavelmente pode ser riscado da lista de pendências).
+- **Navegação turn-by-turn completa (decisão do usuário, 2026-08-11)**: hoje a rota é só um traçado azul estático (`DirectionsService`/`DirectionsRenderer`). O usuário quer o comportamento completo tipo GPS/Google Maps — não uma versão simplificada só-texto — como **pré-requisito antes de publicar na Play Store e na App Store**. Escopo: seguir a posição do usuário via geolocalização (`watchPosition`), girar o mapa conforme o heading, destacar a manobra atual (ex.: "em 200m, vire à direita") a partir dos `steps` do `DirectionsResult`, recalcular a rota se o usuário sair dela, e câmera acompanhando (estilo navegação, não visão de cima parada). Avaliar se web e nativo pedem abordagens diferentes (web: tudo na mão com Maps JS API, que não tem SDK de navegação pronto; nativo: existe o Google Navigation SDK, mas é produto separado com billing/licenciamento próprio — avaliar custo/esforço antes de adotar). Ainda não tem plano técnico detalhado, só o escopo definido nesta conversa.
 
 ## Ambiente no fim da sessão
 
