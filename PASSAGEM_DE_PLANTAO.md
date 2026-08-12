@@ -45,8 +45,13 @@ Pedido do usuário: comparar o mapa nativo com o web e portar o que faltasse. Ac
 3. Foto de posto: confirmar se topa a via de "foto enviada pelo usuário" (proposta, não implementada) — scraping do Google foi recusado por violar ToS deles.
 4. Itens antigos ainda em aberto (não mudou desde a última passagem): SHA-1 de produção na chave Android do Maps (falta EAS), device físico pra validar Google Maps de verdade, projeto Vercel do `admin/` (decisão pausada), EAS Build + contas de loja, política de privacidade, senha fraca do admin master.
 
+## Atualização — 2026-08-11 (política de privacidade + exclusão de conta)
+
+Pendência antiga resolvida (ARQUITETURA.md seção 16): política de privacidade publicada em `/privacidade` (Digital Educação LTDA, CNPJ 32.295.497/0001-09, contato `aiabastec@gmail.com` — dados confirmados com o usuário/consulta pública de CNPJ). Como a política promete um jeito de excluir dados, implementei de verdade: Edge Function `delete-account` (com verificação de JWT, diferente dos jobs de cron) apaga `usuarios` (cascade cuida do resto) + a conta em `auth.users` via service role; botão "Excluir minha conta" em `config.tsx` com confirmação. Deploy feito, validado que a plataforma rejeita chamada sem token — **não testado com login real de ponta a ponta** (precisa logar de verdade com Google no emulador pra confirmar o fluxo completo).
+
 ## O que falta (dá pra eu fazer sozinho, se pedirem)
 
+- Testar a exclusão de conta de ponta a ponta com uma conta Google real (logar no emulador → excluir → confirmar que sumiu do banco).
 - Testar a rota in-app na ficha de **posto de combustível** (só a de recarga foi validada nesta sessão — mesmo código, mas ainda não confirmado visualmente).
 - Feature de foto enviada por usuário (se o usuário confirmar que quer essa via).
 - Push notifications de verdade, confirmação de e-mail (isso último ficou sem sentido agora que só tem login Google — provavelmente pode ser riscado da lista de pendências).

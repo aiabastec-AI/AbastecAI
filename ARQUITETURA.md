@@ -422,7 +422,7 @@ O usuário quer manter `abastec-ai.vercel.app` reservado especificamente pro pai
 - [x] **Confirmação de e-mail real** — resolvida em 2026-08-09 desativando e-mail/senha por completo (só Google), em vez de configurar SMTP. Ver 14.6.
 - [ ] **Projeto Vercel do `admin/`** — decisão pausada, ver 14.5.
 - [ ] **EAS Build + contas de desenvolvedor** (Google Play Console, Apple Developer) — ainda não iniciado.
-- [ ] **Política de privacidade** — obrigatória nas duas lojas, ainda não existe.
+- [x] **Política de privacidade — publicada em 2026-08-11.** Ver seção 16.
 - [ ] Senha do admin master (`aiabastec@gmail.com` / `123456`) é fraca de propósito — trocar antes de dar acesso a mais gente.
 
 ## 15. Mapa web: pins redondos, rota in-app, drag corrigido, histórico progressivo (2026-08-09)
@@ -495,3 +495,25 @@ Usuário reportou pontos de recarga reais faltando (concessionária GWM, um na A
 ### 15.11 Dívida técnica achada: fichas nativas não usam os componentes compartilhados
 
 Durante a investigação desta sessão ficou claro que `app/posto/[id].tsx` e `app/recarga/[id].tsx` são implementações **bespoke**, que nunca importaram `src/components/FichaPosto.tsx`/`FichaRecarga.tsx` (os componentes que o painel do mapa web usa). Motivo real: a versão nativa tem uma UI própria mais rica (cabeçalho com preview do pin sobre mapa, bottom sheet arredondado) que o componente compartilhado — deliberadamente "flat", pensado pra caber dentro do painel lateral do mapa web — não tem. Decisão tomada nesta sessão: **manter a casca nativa própria**, mas importar direto as peças relevantes que só existiam no componente compartilhado (`SecaoPrecos`, lógica de histórico expansível) em vez de reimplementar tudo do zero num componente novo. Efeito: preços colaborativos e histórico de fiscalização progressivo agora também existem no nativo (antes só na web). **Fica valendo como aviso permanente**: qualquer mudança futura em `FichaPosto.tsx`/`FichaRecarga.tsx` (a nota, favoritos, avaliações etc., tudo que continua vindo de lá) não se propaga sozinha pras telas nativas — precisa checar as duas se o campo/comportamento também deveria valer lá.
+
+## 16. Política de privacidade e exclusão de conta (2026-08-11)
+
+Pendência antiga (seção 14.7) resolvida — obrigatória nas duas lojas antes de publicar.
+
+### 16.1 Identidade legal
+
+Levantada com o usuário nesta sessão: controladora dos dados é **Digital Educação LTDA**, CNPJ `32.295.497/0001-09` (confirmado via BrasilAPI, consulta pública ao CNPJ — situação ativa, sede em Araraquara/SP), e-mail de contato `aiabastec@gmail.com` (mesma conta já usada pro Google Cloud/OAuth do projeto, reaproveitada em vez de criar um e-mail novo só pra isso).
+
+### 16.2 A página em si
+
+`app/app/privacidade.tsx` — tela de conteúdo (sem `MapView`/lib nativa, então funciona igual em web e nativo, sem precisar de `.web.tsx`), registrada no `Stack` do `_layout.tsx` como modal. Texto redigido com base num levantamento real do que o app coleta de fato (feito por um agente de exploração antes de escrever qualquer texto, pra não virar boilerplate genérico): login Google (só e-mail é persistido, via Supabase Auth — nome/foto do Google não vão pra nenhuma tabela própria), localização (transitória, nunca persistida — usada só no momento da consulta às RPCs geoespaciais), favoritos (privados), avaliações e preços colaborativos (públicos, mas sem expor e-mail/nome — só um UUID interno), token de push (infraestrutura existe, ainda não ativa de verdade em produção, ver 11.5). Publicada em `/privacidade` na versão web (link no rodapé da landing `index.web.tsx` e em `config.tsx`); no nativo, o link em `config.tsx` abre a URL da web via `Linking.openURL` em vez de navegar pra uma tela interna — mais simples que manter duas versões de um texto legal.
+
+### 16.3 Exclusão de conta
+
+A política promete um jeito de excluir conta/dados — não existia nenhum antes desta sessão (nem no app, nem no admin). Implementado:
+
+- **`supabase/functions/delete-account`** (Edge Function nova): ao contrário de `sync-anp`/`sync-ocm`/`sync-pmqc` (jobs de cron, deploy com `--no-verify-jwt`), esta **precisa** de verificação de JWT ligada (deploy sem essa flag — comportamento padrão) porque só o dono da sessão pode apagar a própria conta. Recebe o token do header `Authorization`, valida via `supabaseAdmin.auth.getUser(token)` (funciona com qualquer client, não precisa de uma segunda chave publishable como secret), apaga a linha em `usuarios` (cascade em `favoritos`/`avaliacoes_usuario`/`precos_combustivel`, já configurado desde as migrations originais) e por fim a própria conta via `auth.admin.deleteUser` — os dois passos só são possíveis com a service role (`PROJECT_SECRET_KEY`, secret já existente do projeto, reaproveitado).
+- **`AuthProvider.tsx`**: `excluirConta()` chama `supabase.functions.invoke("delete-account")` (o client já manda o Authorization da sessão atual sozinho) e faz `signOut()` local no sucesso.
+- **`config.tsx`**: botão "Excluir minha conta" (só visível logado), confirmação via `Alert.alert` (dois botões, "Cancelar"/"Excluir" destrutivo — funciona em native e, via `react-native-web`, cai num `window.confirm` na web) antes de chamar `excluirConta`.
+- **Deploy**: `supabase functions deploy delete-account --project-ref qefkolxhktkzryzcvnfq --use-api` (sem `--no-verify-jwt`) — confirmado que a própria plataforma já rejeita chamada sem header `Authorization` com `401` antes de chegar no código da função (testado via `curl` direto, sem token).
+- **Não testado de ponta a ponta com uma conta real** (exigiria logar de verdade com Google no emulador, que nesta sessão nunca foi fechado até o fim — ver 14.6) — só a rejeição de chamada não-autenticada foi validada. Lógica segue o mesmo padrão comprovado de `sync-anp` (mesmo jeito de criar o client admin), risco residual é baixo, mas vale um teste real antes de publicar nas lojas.
