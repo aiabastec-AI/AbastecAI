@@ -80,6 +80,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  // Chama a Edge Function delete-account (service role, apaga `usuarios` — cascade cuida
+  // de favoritos/avaliações/preços — e a própria conta em auth.users) e depois limpa a
+  // sessão local. A função já valida que o token pertence ao próprio usuário; não dá pra
+  // apagar a conta de outra pessoa por aqui.
+  async function excluirConta() {
+    const { data, error } = await supabase.functions.invoke("delete-account");
+    if (error) return { erro: traduzirErro(error.message) };
+    if (data?.erro) return { erro: data.erro };
+    await supabase.auth.signOut();
+    return { erro: null };
+  }
+
   // Web: deixa o Supabase fazer o redirect completo de página pro Google e,
   // na volta, ler a sessão direto da URL (detectSessionInUrl, ver supabase.ts).
   // Nativo: não existe redirect de página, então abrimos o navegador de auth
@@ -118,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, usuario, carregando, entrarComGoogle, sair }}>
+    <AuthContext.Provider value={{ session, usuario, carregando, entrarComGoogle, sair, excluirConta }}>
       {children}
     </AuthContext.Provider>
   );

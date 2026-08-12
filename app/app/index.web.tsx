@@ -76,6 +76,9 @@ export default function LandingPage() {
       <Text style={styles.rodape}>
         O AbastecAI é um app independente — não tem vínculo oficial com a ANP.
       </Text>
+      <Pressable onPress={() => router.push("/privacidade")}>
+        <Text style={styles.rodapeLink}>Política de privacidade</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -151,5 +154,6 @@ function criarEstilos(colors: ThemeColors) {
     featureTitulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 16 },
     featureTexto: { ...tipografia.bodySm, color: colors.textSecondary },
     rodape: { color: colors.textSecondary, fontSize: 12, textAlign: "center" },
+    rodapeLink: { color: colors.eletrico, fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: -8 },
   });
 }

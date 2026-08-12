@@ -55,6 +55,7 @@ function Navegacao() {
         <Stack.Screen name="config" options={{ presentation: "modal" }} />
         <Stack.Screen name="login" options={{ presentation: "modal" }} />
         <Stack.Screen name="favoritos" options={{ presentation: "modal" }} />
+        <Stack.Screen name="privacidade" options={{ presentation: "modal" }} />
         <Stack.Screen name="posto/[id]" options={{ presentation: "modal" }} />
         <Stack.Screen name="recarga/[id]" options={{ presentation: "modal" }} />
       </Stack>

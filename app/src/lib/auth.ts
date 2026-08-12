@@ -13,6 +13,7 @@ export interface AuthState {
   carregando: boolean;
   entrarComGoogle: () => Promise<{ erro: string | null }>;
   sair: () => Promise<void>;
+  excluirConta: () => Promise<{ erro: string | null }>;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);
