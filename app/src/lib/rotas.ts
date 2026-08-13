@@ -14,10 +14,40 @@ const ANDROID_PACKAGE = "com.abastecai.app";
 const ANDROID_CERT_SHA1 = "5E8F16062EA3CD2C4A0D547876BAA6F38CABF625";
 const IOS_BUNDLE_ID = "com.abastecai.app";
 
+// Um trecho da rota entre duas manobras — a unidade que o motor de navegação (Fase B)
+// usa pra saber "qual instrução mostrar agora" e "quanto falta até a próxima".
+export interface PassoRota {
+  instrucao: string; // já sem tags HTML (a Directions API devolve com <b>/<div> embutidos)
+  manobra: string | null; // ex.: "turn-left", "roundabout-right" — vocabulário do Google, pode vir vazio no 1º/último passo
+  distanciaMetros: number;
+  duracaoSegundos: number;
+  coordenadas: { latitude: number; longitude: number }[];
+  inicio: { latitude: number; longitude: number };
+  fim: { latitude: number; longitude: number };
+}
+
 export interface RotaCalculada {
   coordenadas: { latitude: number; longitude: number }[];
   distanciaTexto: string;
   duracaoTexto: string;
+  distanciaMetros: number;
+  duracaoSegundos: number;
+  passos: PassoRota[];
+}
+
+// A Directions API devolve instrução com tags simples (<b>, <div>) e entidades HTML pra
+// destacar nome de rua — removidas aqui porque o app mostra a instrução como texto puro
+// (banner de navegação, TTS na Fase E). Cobre só o que a API realmente manda, não é um
+// sanitizador de HTML genérico.
+export function limparHtml(html: string): string {
+  return html
+    .replace(/<div[^>]*>/gi, " — ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // Decodifica o "overview_polyline.points" que a Directions API devolve — algoritmo padrão
@@ -87,9 +117,39 @@ export async function buscarRota(
 
   const rota = dados.routes[0];
   const perna = rota.legs?.[0];
+  const passos: PassoRota[] = (perna?.steps ?? []).map(
+    (passo: {
+      html_instructions?: string;
+      maneuver?: string;
+      distance?: { value?: number };
+      duration?: { value?: number };
+      polyline?: { points?: string };
+      start_location?: { lat: number; lng: number };
+      end_location?: { lat: number; lng: number };
+    }) => {
+      const coordenadas = passo.polyline?.points ? decodificarPolyline(passo.polyline.points) : [];
+      return {
+        instrucao: limparHtml(passo.html_instructions ?? ""),
+        manobra: passo.maneuver ?? null,
+        distanciaMetros: passo.distance?.value ?? 0,
+        duracaoSegundos: passo.duration?.value ?? 0,
+        coordenadas,
+        inicio: passo.start_location
+          ? { latitude: passo.start_location.lat, longitude: passo.start_location.lng }
+          : coordenadas[0] ?? { latitude: 0, longitude: 0 },
+        fim: passo.end_location
+          ? { latitude: passo.end_location.lat, longitude: passo.end_location.lng }
+          : coordenadas[coordenadas.length - 1] ?? { latitude: 0, longitude: 0 },
+      };
+    }
+  );
+
   return {
     coordenadas: decodificarPolyline(rota.overview_polyline.points),
     distanciaTexto: perna?.distance?.text ?? "",
     duracaoTexto: perna?.duration?.text ?? "",
+    distanciaMetros: perna?.distance?.value ?? 0,
+    duracaoSegundos: perna?.duration?.value ?? 0,
+    passos,
   };
 }

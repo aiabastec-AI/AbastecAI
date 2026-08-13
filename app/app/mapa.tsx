@@ -48,6 +48,16 @@ import { CardResultadoProximo, type ItemProximo } from "../src/components/CardRe
 import { FichaPosto } from "../src/components/FichaPosto";
 import { FichaRecarga } from "../src/components/FichaRecarga";
 import { PillToggle } from "../src/components/PillToggle";
+import { limparHtml, type PassoRota, type RotaCalculada } from "../src/lib/rotas";
+import {
+  calcularProgressoNavegacao,
+  criarDetectorForaDaRota,
+  type Coordenada,
+  type ProgressoNavegacao,
+} from "../src/lib/navegacao/progresso";
+import { BannerManobra } from "../src/components/BannerManobra";
+import { RodapeNavegacao } from "../src/components/RodapeNavegacao";
+import { criarGuiaDeVoz } from "../src/lib/navegacao/voz";
 import { CONECTORES } from "./filtros";
 
 const TERMO_MINIMO_BUSCA = 2;
@@ -127,6 +137,27 @@ export default function MapaWebScreen() {
   const [rotaDestino, setRotaDestino] = useState<{ lat: number; lng: number } | null>(null);
   const [rotaOrigem, setRotaOrigem] = useState<{ lat: number; lng: number } | null>(null);
   const [calculandoRota, setCalculandoRota] = useState(false);
+  // Guarda a rota com os passos/manobras (não só a polyline que o DirectionsRenderer já
+  // desenha sozinho) — é o que o motor de navegação (Fase B) vai consumir.
+  const [rotaCalculada, setRotaCalculada] = useState<RotaCalculada | null>(null);
+  // Ref espelhando `rotaCalculada` — o callback do watchPosition da navegação é passado pro
+  // `Location.watchPositionAsync` uma vez (na hora de iniciar) e precisa sempre ler a rota
+  // mais recente, inclusive depois de um recálculo; ref evita closure presa no valor antigo.
+  const rotaCalculadaRef = useRef<RotaCalculada | null>(null);
+
+  // Navegação turn-by-turn no mapa web (Fase D) — north-up (sem girar o mapa, diferente do
+  // nativo): reaproveita o <RotaOverlay>/DirectionsRenderer já existente pra desenhar a rota
+  // e pro recálculo (só move `rotaOrigem` pra posição atual), só adiciona o acompanhamento de
+  // posição em tempo real por cima.
+  const [navegando, setNavegando] = useState(false);
+  const [progressoNav, setProgressoNav] = useState<ProgressoNavegacao | null>(null);
+  const [chegouNav, setChegouNav] = useState(false);
+  const [recalculandoNav, setRecalculandoNav] = useState(false);
+  const indicePassoNavRef = useRef(0);
+  const detectorNavRef = useRef(criarDetectorForaDaRota());
+  const inscricaoNavRef = useRef<Location.LocationSubscription | null>(null);
+  const chegouNavRef = useRef(false);
+  const guiaVozNavRef = useRef(criarGuiaDeVoz());
 
   function definirMinhaLocalizacao(coords: { lat: number; lng: number }) {
     minhaLocalizacaoRef.current = coords;
@@ -157,11 +188,97 @@ export default function MapaWebScreen() {
     setRotaDestino(destino);
   }
 
+  function aoReceberPosicaoNav(coords: Coordenada) {
+    if (chegouNavRef.current) return;
+
+    // North-up: só centraliza o mapa na posição, sem mexer no heading/zoom (diferente do
+    // nativo) — é o comportamento padrão do próprio Google Maps na versão web/desktop.
+    setCentroMapa({ lat: coords.latitude, lng: coords.longitude });
+    definirMinhaLocalizacao({ lat: coords.latitude, lng: coords.longitude });
+
+    const rotaAtual = rotaCalculadaRef.current;
+    if (!rotaAtual) return;
+
+    const novoProgresso = calcularProgressoNavegacao(rotaAtual.passos, coords, indicePassoNavRef.current);
+    if (!novoProgresso) return;
+
+    indicePassoNavRef.current = novoProgresso.indicePassoAtual;
+    setProgressoNav(novoProgresso);
+
+    if (novoProgresso.chegou) {
+      chegouNavRef.current = true;
+      setChegouNav(true);
+      inscricaoNavRef.current?.remove();
+      guiaVozNavRef.current.falarChegada();
+      return;
+    }
+
+    const ultimoPasso = novoProgresso.indicePassoAtual === rotaAtual.passos.length - 1;
+    const passoAnunciado = ultimoPasso
+      ? rotaAtual.passos[novoProgresso.indicePassoAtual]
+      : rotaAtual.passos[novoProgresso.indicePassoAtual + 1];
+    guiaVozNavRef.current.falarSeNecessario(
+      novoProgresso.indicePassoAtual,
+      novoProgresso.distanciaAteManobraMetros,
+      passoAnunciado?.instrucao ?? ""
+    );
+
+    if (detectorNavRef.current.registrarAmostra(novoProgresso.distanciaPerpendicularMetros)) {
+      // Recalcula reaproveitando o <RotaOverlay> já existente — só move a origem da rota pra
+      // posição atual, o próprio DirectionsService dispara de novo (ver useEffect dele).
+      setRecalculandoNav(true);
+      setRotaOrigem({ lat: coords.latitude, lng: coords.longitude });
+      indicePassoNavRef.current = 0;
+      detectorNavRef.current.reiniciar();
+      guiaVozNavRef.current.reiniciar();
+    }
+  }
+
+  async function iniciarNavegacao() {
+    if (!rotaDestino) return;
+    chegouNavRef.current = false;
+    setChegouNav(false);
+    setProgressoNav(null);
+    indicePassoNavRef.current = 0;
+    detectorNavRef.current.reiniciar();
+    guiaVozNavRef.current.reiniciar();
+    try {
+      inscricaoNavRef.current = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000, distanceInterval: 5 },
+        (evento) =>
+          aoReceberPosicaoNav({ latitude: evento.coords.latitude, longitude: evento.coords.longitude })
+      );
+      setNavegando(true);
+    } catch {
+      setErro("Não foi possível acessar sua localização pra navegar.");
+    }
+  }
+
+  function encerrarNavegacao() {
+    inscricaoNavRef.current?.remove();
+    inscricaoNavRef.current = null;
+    setNavegando(false);
+    setChegouNav(false);
+    chegouNavRef.current = false;
+    setProgressoNav(null);
+    setRecalculandoNav(false);
+    setRotaOrigem(null);
+    setRotaDestino(null);
+    setRotaCalculada(null);
+    rotaCalculadaRef.current = null;
+  }
+
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
   const [permissaoNegada, setPermissaoNegada] = useState(false);
   const [cidadeDigitada, setCidadeDigitada] = useState("");
   const [buscandoCidade, setBuscandoCidade] = useState(false);
   const [erroCidade, setErroCidade] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      inscricaoNavRef.current?.remove();
+    };
+  }, []);
 
   const carregarDados = useCallback(
     async (lat: number, lng: number) => {
@@ -334,6 +451,15 @@ export default function MapaWebScreen() {
     return itens.sort((a, b) => a.dado.distancia_m - b.dado.distancia_m).slice(0, 20);
   }, [postos, pontosRecarga, mostrarCombustivel, mostrarEletrico]);
 
+  const corAcentoNav = selecionado?.tipo === "recarga" ? colors.eletrico : colors.combustivel;
+  const indiceAtualNav = progressoNav?.indicePassoAtual ?? 0;
+  const passosNav = rotaCalculada?.passos ?? [];
+  const ehUltimoPassoNav = indiceAtualNav === passosNav.length - 1;
+  // Mesma lógica da navegação nativa (ver navegacao.tsx): a manobra exibida é a do passo
+  // SEGUINTE ao atual (é o que acontece no fim do trecho que se está percorrendo agora).
+  const passoParaExibirNav = ehUltimoPassoNav ? passosNav[indiceAtualNav] : passosNav[indiceAtualNav + 1];
+  const distanciaAteManobraNav = progressoNav?.distanciaAteManobraMetros ?? passosNav[0]?.distanciaMetros ?? 0;
+
   if (!GOOGLE_MAPS_WEB_API_KEY) {
     return (
       <View style={[styles.container, styles.centralizado]}>
@@ -357,8 +483,7 @@ export default function MapaWebScreen() {
           onClick={() => {
             setSelecionado(null);
             setPainelEsquerdo(null);
-            setRotaOrigem(null);
-            setRotaDestino(null);
+            encerrarNavegacao();
           }}
           onZoomChanged={(e) => {
             zoomAtualRef.current = e.detail.zoom;
@@ -382,8 +507,11 @@ export default function MapaWebScreen() {
             <RotaOverlay
               origem={rotaOrigem}
               destino={rotaDestino}
-              aoCalcular={(sucesso) => {
+              aoCalcular={(sucesso, rota) => {
                 setCalculandoRota(false);
+                setRotaCalculada(rota ?? null);
+                rotaCalculadaRef.current = rota ?? null;
+                setRecalculandoNav(false);
                 if (!sucesso) setErro("Não foi possível calcular a rota.");
               }}
             />
@@ -463,26 +591,57 @@ export default function MapaWebScreen() {
               <Text style={styles.statusTexto}>{erro}</Text>
             </View>
           )}
-          {(calculandoRota || (rotaOrigem && rotaDestino)) && (
+          {!navegando && (calculandoRota || (rotaOrigem && rotaDestino)) && (
             <View style={styles.statusBadge}>
               {calculandoRota && <ActivityIndicator size="small" color={colors.textPrimary} />}
               <Text style={styles.statusTexto}>
                 {calculandoRota ? "Calculando rota…" : "Mostrando rota"}
               </Text>
               {!calculandoRota && (
-                <Pressable
-                  onPress={() => {
-                    setRotaOrigem(null);
-                    setRotaDestino(null);
-                  }}
-                >
-                  <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
-                </Pressable>
+                <>
+                  <Pressable style={styles.botaoIniciarNav} onPress={iniciarNavegacao}>
+                    <MaterialCommunityIcons name="navigation-variant" size={14} color={colors.background} />
+                    <Text style={styles.botaoIniciarNavTexto}>Iniciar navegação</Text>
+                  </Pressable>
+                  <Pressable onPress={encerrarNavegacao}>
+                    <MaterialCommunityIcons name="close" size={16} color={colors.textSecondary} />
+                  </Pressable>
+                </>
               )}
             </View>
           )}
         </View>
       </View>
+
+      {navegando && (
+        <>
+          {!chegouNav && (
+            <View style={styles.navBannerWrapper}>
+              <BannerManobra
+                manobra={passoParaExibirNav?.manobra}
+                instrucao={passoParaExibirNav?.instrucao}
+                distanciaMetros={distanciaAteManobraNav}
+                corAcento={corAcentoNav}
+              />
+            </View>
+          )}
+          {recalculandoNav && (
+            <View style={styles.avisoRecalculoNav}>
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <Text style={styles.statusTexto}>Recalculando rota…</Text>
+            </View>
+          )}
+          <View style={styles.navRodapeWrapper}>
+            <RodapeNavegacao
+              chegou={chegouNav}
+              distanciaRestanteMetros={progressoNav?.distanciaRestanteTotalMetros ?? rotaCalculada?.distanciaMetros ?? 0}
+              duracaoRestanteSegundos={progressoNav?.duracaoRestanteTotalSegundos ?? rotaCalculada?.duracaoSegundos ?? 0}
+              corAcento={corAcentoNav}
+              aoEncerrar={encerrarNavegacao}
+            />
+          </View>
+        </>
+      )}
 
       {!mostrarOnboarding && resultadosProximos.length > 0 && (
         <>
@@ -966,6 +1125,43 @@ function criarEstilosPainelBusca(colors: ThemeColors) {
 // no mapa, em vez de abrir o Google Maps externo. `useMapsLibrary("routes")` é o jeito
 // assíncrono certo de pegar essas classes (ver o mesmo cuidado em pinSvg.ts com Size/Point —
 // `new google.maps.DirectionsService()` direto também pode quebrar antes da lib carregar).
+// Converte o DirectionsResult da JS SDK (LatLng são objetos com métodos .lat()/.lng(),
+// não campos planos como na REST API que o lado nativo consome) pro mesmo formato
+// RotaCalculada/PassoRota de rotas.ts — assim o motor de navegação (Fase B em diante)
+// trabalha com um único formato independente de plataforma.
+function paraRotaCalculada(resultado: google.maps.DirectionsResult): RotaCalculada | null {
+  const perna = resultado.routes[0]?.legs[0];
+  if (!perna) return null;
+
+  const passos: PassoRota[] = (perna.steps ?? []).map((passo) => {
+    const coordenadas = (passo.path ?? []).map((p) => ({ latitude: p.lat(), longitude: p.lng() }));
+    return {
+      instrucao: limparHtml(passo.instructions ?? ""),
+      manobra: passo.maneuver || null,
+      distanciaMetros: passo.distance?.value ?? 0,
+      duracaoSegundos: passo.duration?.value ?? 0,
+      coordenadas,
+      inicio: passo.start_location
+        ? { latitude: passo.start_location.lat(), longitude: passo.start_location.lng() }
+        : coordenadas[0] ?? { latitude: 0, longitude: 0 },
+      fim: passo.end_location
+        ? { latitude: passo.end_location.lat(), longitude: passo.end_location.lng() }
+        : coordenadas[coordenadas.length - 1] ?? { latitude: 0, longitude: 0 },
+    };
+  });
+
+  return {
+    coordenadas: (perna.steps ?? []).flatMap((passo) =>
+      (passo.path ?? []).map((p) => ({ latitude: p.lat(), longitude: p.lng() }))
+    ),
+    distanciaTexto: perna.distance?.text ?? "",
+    duracaoTexto: perna.duration?.text ?? "",
+    distanciaMetros: perna.distance?.value ?? 0,
+    duracaoSegundos: perna.duration?.value ?? 0,
+    passos,
+  };
+}
+
 function RotaOverlay({
   origem,
   destino,
@@ -973,7 +1169,7 @@ function RotaOverlay({
 }: {
   origem: { lat: number; lng: number };
   destino: { lat: number; lng: number };
-  aoCalcular: (sucesso: boolean) => void;
+  aoCalcular: (sucesso: boolean, rota?: RotaCalculada) => void;
 }) {
   const map = useMap();
   const rotas = useMapsLibrary("routes");
@@ -998,7 +1194,7 @@ function RotaOverlay({
         if (cancelado) return;
         if (status === "OK" && resultado && rendererRef.current) {
           rendererRef.current.setDirections(resultado);
-          aoCalcular(true);
+          aoCalcular(true, paraRotaCalculada(resultado) ?? undefined);
         } else {
           aoCalcular(false);
         }
@@ -1131,6 +1327,32 @@ function criarEstilos(colors: ThemeColors) {
     },
     statusBadgeErro: { borderWidth: 1, borderColor: colors.notaBaixa },
     statusTexto: { color: colors.textSecondary, fontSize: 12 },
+    botaoIniciarNav: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.textPrimary,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    botaoIniciarNavTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+    navBannerWrapper: { position: "absolute", top: 34, left: 16, width: 380, maxWidth: "40%" },
+    navRodapeWrapper: { position: "absolute", left: 16, bottom: 32, width: 380, maxWidth: "40%" },
+    avisoRecalculoNav: {
+      position: "absolute",
+      top: 130,
+      left: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
     fab: {
       position: "absolute",
       right: 16,

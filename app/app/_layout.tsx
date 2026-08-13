@@ -58,6 +58,10 @@ function Navegacao() {
         <Stack.Screen name="privacidade" options={{ presentation: "modal" }} />
         <Stack.Screen name="posto/[id]" options={{ presentation: "modal" }} />
         <Stack.Screen name="recarga/[id]" options={{ presentation: "modal" }} />
+        <Stack.Screen
+          name="navegacao"
+          options={{ presentation: "fullScreenModal", gestureEnabled: false }}
+        />
       </Stack>
     </>
   );

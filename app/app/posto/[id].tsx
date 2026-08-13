@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
@@ -28,6 +28,7 @@ const HISTORICO_VISIVEL_INICIAL = 2;
 
 export default function FichaPosto() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { colors, modo: modoTema } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const mapRef = useRef<MapView | null>(null);
@@ -223,6 +224,26 @@ export default function FichaPosto() {
           </View>
         )}
 
+        {rota && (
+          <Pressable
+            style={styles.botaoNavegacao}
+            onPress={() =>
+              router.push({
+                pathname: "/navegacao",
+                params: {
+                  lat: String(posto!.latitude),
+                  lng: String(posto!.longitude),
+                  nome,
+                  tipo: "combustivel",
+                },
+              })
+            }
+          >
+            <MaterialCommunityIcons name="navigation-variant" size={20} color={colors.combustivel} />
+            <Text style={styles.botaoNavegacaoTexto}>Iniciar navegação</Text>
+          </Pressable>
+        )}
+
         <View style={styles.infoCard}>
           {endereco && (
             <LinhaIcone
@@ -411,6 +432,18 @@ function criarEstilos(colors: ThemeColors) {
         boxShadow: colors.glowEletrico,
       },
       botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 16 },
+      botaoNavegacao: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        borderRadius: 14,
+        paddingVertical: 14,
+        borderWidth: 1,
+        borderColor: colors.combustivel + "80",
+        marginTop: -8,
+      },
+      botaoNavegacaoTexto: { color: colors.combustivel, fontFamily: "Inter_600SemiBold", fontSize: 15 },
       infoCard: {
         backgroundColor: colors.surfaceElevated,
         borderRadius: 16,

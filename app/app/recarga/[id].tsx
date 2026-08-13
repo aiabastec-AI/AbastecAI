@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
@@ -32,6 +32,7 @@ function statusRecarga(status: string | null): { texto: string; cor: keyof Theme
 
 export default function FichaRecarga() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { colors, modo: modoTema } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const mapRef = useRef<MapView | null>(null);
@@ -266,6 +267,26 @@ export default function FichaRecarga() {
           </View>
         )}
 
+        {rota && (
+          <Pressable
+            style={styles.botaoNavegacao}
+            onPress={() =>
+              router.push({
+                pathname: "/navegacao",
+                params: {
+                  lat: String(ponto!.latitude),
+                  lng: String(ponto!.longitude),
+                  nome: ponto!.nome ?? "",
+                  tipo: "eletrico",
+                },
+              })
+            }
+          >
+            <MaterialCommunityIcons name="navigation-variant" size={20} color={colors.eletrico} />
+            <Text style={styles.botaoNavegacaoTexto}>Iniciar navegação</Text>
+          </Pressable>
+        )}
+
         <SecaoAvaliacoes alvo={{ tipo: "recarga", id: ponto.id }} />
       </ScrollView>
     </View>
@@ -405,6 +426,18 @@ function criarEstilos(colors: ThemeColors) {
       boxShadow: colors.glowEletrico,
     },
     botaoPrimarioTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 18 },
+    botaoNavegacao: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      borderRadius: 14,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: colors.eletrico + "80",
+      marginTop: -8,
+    },
+    botaoNavegacaoTexto: { color: colors.eletrico, fontFamily: "Inter_600SemiBold", fontSize: 15 },
     texto: { ...tipografia.bodySm, color: colors.textSecondary },
   });
 }
