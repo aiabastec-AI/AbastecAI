@@ -516,4 +516,51 @@ A política promete um jeito de excluir conta/dados — não existia nenhum ante
 - **`AuthProvider.tsx`**: `excluirConta()` chama `supabase.functions.invoke("delete-account")` (o client já manda o Authorization da sessão atual sozinho) e faz `signOut()` local no sucesso.
 - **`config.tsx`**: botão "Excluir minha conta" (só visível logado), confirmação via `Alert.alert` (dois botões, "Cancelar"/"Excluir" destrutivo — funciona em native e, via `react-native-web`, cai num `window.confirm` na web) antes de chamar `excluirConta`.
 - **Deploy**: `supabase functions deploy delete-account --project-ref qefkolxhktkzryzcvnfq --use-api` (sem `--no-verify-jwt`) — confirmado que a própria plataforma já rejeita chamada sem header `Authorization` com `401` antes de chegar no código da função (testado via `curl` direto, sem token).
+
+## 17. Navegação turn-by-turn (2026-08-12)
+
+Pendência antiga (seção 15.9/PASSAGEM_DE_PLANTAO) resolvida — decisão do usuário de 2026-08-11: a rota até aqui era só um traçado estático (`DirectionsRenderer`), sem acompanhamento de posição, manobra atual ou recálculo. Implementado de ponta a ponta, nativo e web, numa sessão só (autorização prévia do usuário pra trabalhar sozinho, só parar se esbarrasse em algo que precisasse dele).
+
+### 17.1 Decisão: DIY nos dois lados, não Google Navigation SDK
+
+O Navigation SDK do Google só existe pra mobile (Android/iOS) — não tem equivalente pra web, e a versão web do app é uma entrega real, não só um fallback. Usar o SDK nativo de um lado e inventar tudo do zero do outro geraria duas implementações divergentes, além do SDK exigir billing próprio e dev client customizado. Optado por uma engine de navegação própria e compartilhada, alimentada pela Directions API que os dois lados já usavam. Web ficou **north-up** (mapa não gira) — é o que o próprio Google Maps faz na versão desktop, evita o custo de configurar vector maps (`mapId`) só pra girar o mapa. Nativo ficou **heading-up** (convenção esperada de app de GPS mobile).
+
+### 17.2 Camada de dados (Fase A)
+
+`src/lib/rotas.ts`: `buscarRota` (nativo, REST) e o `RotaOverlay` do `mapa.tsx` (web, JS SDK) agora extraem `legs[0].steps[]` — cada `PassoRota` carrega instrução (`limparHtml` tira as tags que a API manda), `maneuver`, distância/duração do trecho e a polyline própria do trecho decodificada. `RotaCalculada` ganhou `distanciaMetros`/`duracaoSegundos` totais além dos textos já existentes. Os dois lados convergem pro mesmo formato apesar de a REST API e a JS SDK devolverem os dados em formatos diferentes (`LatLng` como objeto com `.lat()/.lng()` na SDK vs. campos planos na REST).
+
+### 17.3 Motor de progresso (Fase B)
+
+`src/lib/navegacao/progresso.ts` — lógica pura, sem React nem API de plataforma, usada pelos dois lados:
+- `calcularProgressoNavegacao(passos, posicaoAtual, indicePassoMinimo)`: projeta o GPS na polyline mais próxima (plano local em metros, clampado nas pontas do segmento), procurando **só a partir do passo mínimo em diante** — nunca pra trás, pra um fixo de GPS ruidoso não fazer o passo atual regredir. Devolve passo atual, distância/tempo até a manobra, total restante até o destino e a distância perpendicular (quão longe da rota).
+- `criarDetectorForaDaRota()`: histerese (3 amostras seguidas acima de 50m) + cooldown (10s) antes de disparar recálculo — evita rechamar a Directions API à toa por ruído de GPS oscilando na borda do limiar.
+- `calcularRumo(a, b)`: bearing entre dois fixos GPS consecutivos, usado pro heading-up nativo — preferido à bússola do aparelho, que sofre interferência dentro do carro.
+- Validado com um script standalone (`tsx`) antes de integrar: distância, rumo, progresso dentro/fora do passo, detecção de chegada e a histerese/cooldown do detector, todos batendo com o esperado.
+
+### 17.4 Navegação nativa (Fase C)
+
+`app/navegacao.tsx` (tela cheia nova, `presentation: "fullScreenModal"`, `gestureEnabled: false`) — ativada pelo botão "Iniciar navegação" que aparece em `posto/[id].tsx`/`recarga/[id].tsx` depois que uma rota já foi traçada. `Location.watchPositionAsync` (`Accuracy.BestForNavigation`) alimenta o motor de progresso; câmera controlada via `mapRef.animateCamera({ center, heading, pitch: 60, zoom: 17.5 })` a cada posição nova. `useKeepAwake` (novo pacote `expo-keep-awake`) mantém a tela acesa. Banner de manobra e rodapé de distância/tempo viraram componentes compartilhados (`src/components/BannerManobra.tsx`, `RodapeNavegacao.tsx`) — RN core + `MaterialCommunityIcons` já funcionam em web via `react-native-web`, então a Fase D reaproveitou os dois sem duplicar UI.
+
+**Pegadinha nova, mesma categoria da 14.1/15.11**: `navegacao.tsx` importa `react-native-maps` e precisou de `navegacao.web.tsx` (redireciona pra `/mapa`, rota inexistente de propósito na web) — sem isso o Expo Router monta a árvore de rotas inteira mesmo no bundle web e quebra o app inteiro (`codegenNativeComponent is not a function`) mesmo sem ninguém navegar pra `/navegacao`.
+
+### 17.5 Navegação web (Fase D)
+
+Direto no `mapa.tsx`, sem rota nova: reaproveita o `<RotaOverlay>`/`DirectionsRenderer` já existente — o recálculo por fora-da-rota só move o state `rotaOrigem` pra posição atual, o `useEffect` do overlay já dispara o `DirectionsService` de novo sozinho. `watchPositionAsync` centraliza o mapa (`setCentroMapa`) a cada posição, sem mexer em heading/zoom. Botão "Iniciar navegação" aparece ao lado do badge "Mostrando rota" quando a rota está pronta; banner/rodapé usam os mesmos componentes compartilhados da Fase C.
+
+### 17.6 Voz e ícones de manobra (Fase E)
+
+`src/lib/navegacao/icones.ts`: mapeia o vocabulário de `maneuver` da Directions API (não é enum fechado — a doc do Google avisa que pode mudar) pros ícones do MaterialCommunityIcons disponíveis (não existe glifo de rotatória no set, usa `rotate-left`/`rotate-right` como aproximação). `src/lib/navegacao/voz.ts`: guia por voz com `expo-speech` (funciona nos dois lados — TTS nativo no celular, `SpeechSynthesis` do navegador na web) — anuncia a manobra a ~200m ("Em 200 metros, ...") e de novo a ~30m (iminente), mais um anúncio de chegada. Reinicia sozinho quando o passo muda ou num recálculo.
+
+### 17.7 Ambiente e validação
+
+- **JDK**: Gradle 9 exige JVM 17+; o `JAVA_HOME` documentado na seção 7 (`jdk17-extracted`) segue valendo, só reforçando que `expo run:android` falha alto e claro (`Gradle requires JVM 17 or later`) se rodar sem exportar isso primeiro.
+- **Build nativo**: as duas dependências novas (`expo-keep-awake`, `expo-speech`) exigiram rebuild completo — o procedimento manual da seção 7 (build trava/pode travar em `installDebug`, instalar o APK direto via `adb install -r` se precisar) seguiu valendo, embora nas duas rodadas desta sessão o `expo run:android` tenha terminado sozinho sem travar.
+- **Chave do Maps web por porta**: `expo start --web` numa porta fora da allowlist da chave (ex.: 8082, usada só porque a 8081 estava ocupada pelo Metro nativo) quebra com `RefererNotAllowedMapError`. Mais simples liberar a 8081 (matar o processo antigo) do que mexer na allowlist da chave no GCP.
+- **Testado de ponta a ponta**: nativo no emulador `medium_phone` (build + instalação manual via `adb`, fluxo completo traçar rota → iniciar navegação → banner de manobra com ícone/distância corretos → mapa heading-up → encerrar voltando limpo pra ficha, sem crash) e web via Playwright headless (Chrome real, geolocalização mockada — mesmo fluxo, banner/rodapé/mapa north-up, sem erro no console). Um `SIGSEGV` isolado apareceu no primeiro boot do emulador antes de eu tocar em qualquer tela nova (crash dentro do Fabric/`react-native-maps`, no `index.tsx` que eu não toquei nesta sessão) — não reproduziu nas tentativas seguintes, tratado como flakiness do emulador/driver gráfico, não regressão.
+
+### 17.8 O que ficou pra depois
+
+- [ ] Teste em device físico com GPS de verdade (emulador não tem GPS real — a validação foi com localização mockada/fixa do próprio emulador).
+- [ ] SHA-1 de produção na chave Android do Maps (pendência antiga, seção 7/14) — vai bloquear a Directions API especificamente numa build de release assinada, justamente onde a navegação importa mais.
+- [ ] Voz por padrão ligada ou com toggle — hoje sempre fala, sem opção de silenciar na UI.
 - **Não testado de ponta a ponta com uma conta real** (exigiria logar de verdade com Google no emulador, que nesta sessão nunca foi fechado até o fim — ver 14.6) — só a rejeição de chamada não-autenticada foi validada. Lógica segue o mesmo padrão comprovado de `sync-anp` (mesmo jeito de criar o client admin), risco residual é baixo, mas vale um teste real antes de publicar nas lojas.

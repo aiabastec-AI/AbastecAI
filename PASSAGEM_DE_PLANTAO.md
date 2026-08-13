@@ -49,15 +49,21 @@ Pedido do usuário: comparar o mapa nativo com o web e portar o que faltasse. Ac
 
 Pendência antiga resolvida (ARQUITETURA.md seção 16): política de privacidade publicada em `/privacidade` (Digital Educação LTDA, CNPJ 32.295.497/0001-09, contato `aiabastec@gmail.com` — dados confirmados com o usuário/consulta pública de CNPJ). Como a política promete um jeito de excluir dados, implementei de verdade: Edge Function `delete-account` (com verificação de JWT, diferente dos jobs de cron) apaga `usuarios` (cascade cuida do resto) + a conta em `auth.users` via service role; botão "Excluir minha conta" em `config.tsx` com confirmação. Deploy feito, validado que a plataforma rejeita chamada sem token — **não testado com login real de ponta a ponta** (precisa logar de verdade com Google no emulador pra confirmar o fluxo completo).
 
+## Atualização — 2026-08-12 (navegação turn-by-turn)
+
+Pendência da entrada anterior resolvida (ARQUITETURA.md seção 17): navegação turn-by-turn completa, nativo e web, em 5 fases (dados/steps da Directions API → motor de progresso puro → tela nativa heading-up → overlay web north-up → voz TTS + ícones de manobra). Decisão técnica: nada de Google Navigation SDK (só existe pra mobile, web ficaria sem equivalente de qualquer jeito) — engine própria compartilhada, alimentada pela Directions API que os dois lados já usavam. Testado de ponta a ponta nos dois lados nesta sessão (emulador Android via build+instalação manual, web via Playwright headless com geolocalização mockada) — sem crash, banner de manobra/rodapé/recálculo funcionando. Duas dependências nativas novas: `expo-keep-awake`, `expo-speech` (ambas já rebuildadas e validadas no emulador).
+
 ## O que falta (dá pra eu fazer sozinho, se pedirem)
 
 - Testar a exclusão de conta de ponta a ponta com uma conta Google real (logar no emulador → excluir → confirmar que sumiu do banco).
-- Testar a rota in-app na ficha de **posto de combustível** (só a de recarga foi validada nesta sessão — mesmo código, mas ainda não confirmado visualmente).
+- Testar a rota in-app na ficha de **posto de combustível** (só a de recarga foi validada nesta sessão e na anterior — mesmo código, mas ainda não confirmado visualmente).
+- Testar a navegação turn-by-turn em device físico com GPS de verdade (emulador não tem GPS real — validação desta sessão foi com localização fixa/mockada).
+- Toggle de voz na navegação — hoje o guia por voz sempre fala, sem opção de silenciar na UI.
 - Feature de foto enviada por usuário (se o usuário confirmar que quer essa via).
 - Push notifications de verdade, confirmação de e-mail (isso último ficou sem sentido agora que só tem login Google — provavelmente pode ser riscado da lista de pendências).
-- **Navegação turn-by-turn completa (decisão do usuário, 2026-08-11)**: hoje a rota é só um traçado azul estático (`DirectionsService`/`DirectionsRenderer`). O usuário quer o comportamento completo tipo GPS/Google Maps — não uma versão simplificada só-texto — como **pré-requisito antes de publicar na Play Store e na App Store**. Escopo: seguir a posição do usuário via geolocalização (`watchPosition`), girar o mapa conforme o heading, destacar a manobra atual (ex.: "em 200m, vire à direita") a partir dos `steps` do `DirectionsResult`, recalcular a rota se o usuário sair dela, e câmera acompanhando (estilo navegação, não visão de cima parada). Avaliar se web e nativo pedem abordagens diferentes (web: tudo na mão com Maps JS API, que não tem SDK de navegação pronto; nativo: existe o Google Navigation SDK, mas é produto separado com billing/licenciamento próprio — avaliar custo/esforço antes de adotar). Ainda não tem plano técnico detalhado, só o escopo definido nesta conversa.
 
 ## Ambiente no fim da sessão
 
-- App público (`https://app-two-wine-64.vercel.app`) com deploy automático confirmado funcionando a cada push — todas as mudanças de hoje já estão no ar e validadas visualmente via Playwright.
-- Não mexi no emulador Android nem no servidor do admin nesta sessão (além de subir o admin brevemente pra validar o login Google) — status deles desconhecido, procedimento de sempre em `ARQUITETURA.md` seção 7.
+- App público (`https://app-two-wine-64.vercel.app`) com deploy automático a cada push — **as mudanças desta sessão (navegação turn-by-turn) ainda não foram commitadas nem enviadas**, só testadas localmente (emulador + `expo start --web` na porta 8081).
+- Emulador Android (`medium_phone`) e servidor web local (`expo start --web`, porta 8081) ficaram rodando no fim da sessão. Metro nativo antigo (porta 8081, de uma rodada anterior de `expo run:android`) foi encerrado de propósito pra liberar a porta pro dev server web (a chave do Maps web só libera origem por porta cadastrada — ver ARQUITETURA.md 17.7).
+- Não mexi no servidor do admin nesta sessão.
