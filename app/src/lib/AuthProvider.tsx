@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import { getQueryParams } from "expo-auth-session/build/QueryParams";
-import type { Session } from "@supabase/supabase-js";
+import { FunctionsHttpError, type Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { AuthContext, type Usuario } from "./auth";
 import { registrarPushToken } from "./pushNotifications";
@@ -86,7 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // apagar a conta de outra pessoa por aqui.
   async function excluirConta() {
     const { data, error } = await supabase.functions.invoke("delete-account");
-    if (error) return { erro: traduzirErro(error.message) };
+    if (error) {
+      // FunctionsHttpError.message é só um texto genérico ("Edge Function returned a
+      // non-2xx status code") — a mensagem real que a função devolveu vem no corpo da
+      // resposta, acessível via error.context (a Response crua).
+      if (error instanceof FunctionsHttpError) {
+        const corpo = await error.context.json().catch(() => null);
+        return { erro: traduzirErro(corpo?.erro ?? error.message) };
+      }
+      return { erro: traduzirErro(error.message) };
+    }
     if (data?.erro) return { erro: data.erro };
     await supabase.auth.signOut();
     return { erro: null };
@@ -114,13 +123,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.url) return { erro: "Não foi possível iniciar o login com Google." };
 
     const resultado = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-    if (resultado.type !== "success" || !resultado.url) {
+    // "cancel"/"dismiss" é o usuário fechando o navegador por conta própria — não é erro,
+    // fica quieto. Qualquer outro caso sem sucesso é falha real e precisa aparecer pro
+    // usuário, senão o botão parece não fazer nada (já aconteceu: ver ARQUITETURA.md 18).
+    if (resultado.type === "cancel" || resultado.type === "dismiss") {
       return { erro: null };
+    }
+    if (resultado.type !== "success" || !resultado.url) {
+      return { erro: "Não foi possível concluir o login com Google. Tente de novo." };
     }
 
     const { params, errorCode } = getQueryParams(resultado.url);
     if (errorCode) return { erro: traduzirErro(errorCode) };
-    if (!params.access_token || !params.refresh_token) return { erro: null };
+    if (!params.access_token || !params.refresh_token) {
+      return { erro: "Não foi possível concluir o login com Google. Tente de novo." };
+    }
 
     const { error: erroSessao } = await supabase.auth.setSession({
       access_token: params.access_token,

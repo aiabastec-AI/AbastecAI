@@ -57,9 +57,16 @@ Pendência da entrada anterior resolvida (ARQUITETURA.md seção 17): navegaçã
 
 Primeiro build de produção Android feito na EAS (detalhe em ARQUITETURA.md seção 18). O `.aab` gerado foi baixado e guardado fora do repo (`G:\dev\AbastecAI-builds\android\`, `*.aab`/`*.apk` agora no `.gitignore`). Pendência antiga resolvida: SHA-1 de produção do keystore da EAS registrado na chave `AbastecAI Android` do GCP (junto com o de debug, não substituiu). Conta do Google Play Console segue em verificação — `eas submit` automático fica pra quando ela for aprovada; por ora o `.aab` fica guardado esperando envio manual ou automático.
 
+## Atualização — 2026-08-16 (login Google e exclusão de conta testados de ponta a ponta)
+
+Duas pendências antigas fechadas de vez (detalhe técnico completo em ARQUITETURA.md 18.1) testando ao vivo no emulador com conta Google real:
+
+- **Login Google**: funciona. O "loop eterno" que o usuário relatou era eu mesmo errando a escala das coordenadas dos toques automatizados (nenhum toque real acontecia) + emulador sem conta Google cadastrada ainda — não era bug do app. No processo achei e corrigi um bug real de robustez: falha no OAuth que não fosse sucesso/cancelamento ficava silenciosa (`erro: null`), fazendo a tela "voltar sozinha" sem aviso — agora mostra mensagem de erro de verdade.
+- **Exclusão de conta**: achado um bug real de schema — `usuarios.auth_id` e `admin_usuarios.auth_id` referenciavam `auth.users(id)` sem `ON DELETE CASCADE`, travando `auth.admin.deleteUser` com `"Database error deleting user"`. Corrigido com a migration `20260816190000_cascade_auth_users_fks.sql`, **já aplicada em produção** via Management API (o MCP/CLI da Supabase desta máquina não enxerga o projeto AbastecAI — está em outra conta). Confirmado no banco que o usuário some de `usuarios`, `admin_usuarios` e `auth.users`.
+- Migration local criada em `supabase/migrations/` pra manter o histórico do schema — ainda **não commitada** junto com o fix do `AuthProvider.tsx`, ver estado do git no fim da sessão.
+
 ## O que falta (dá pra eu fazer sozinho, se pedirem)
 
-- Testar a exclusão de conta de ponta a ponta com uma conta Google real (logar no emulador → excluir → confirmar que sumiu do banco).
 - Testar a rota in-app na ficha de **posto de combustível** (só a de recarga foi validada nesta sessão e na anterior — mesmo código, mas ainda não confirmado visualmente).
 - Testar a navegação turn-by-turn em device físico com GPS de verdade (emulador não tem GPS real — validação desta sessão foi com localização fixa/mockada).
 - Toggle de voz na navegação — hoje o guia por voz sempre fala, sem opção de silenciar na UI.
