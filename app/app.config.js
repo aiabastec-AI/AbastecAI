@@ -12,6 +12,7 @@ module.exports = {
   expo: {
     name: "AbastecAI",
     slug: "abastecai",
+    owner: "scrindevai",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -72,6 +73,9 @@ module.exports = {
       // sem aumentar a exposição real do segredo.
       googleMapsAndroidApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
       googleMapsIosApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
+      eas: {
+        projectId: "4736d0fc-0f43-4e57-870b-909a5559c01b",
+      },
     },
   },
 };

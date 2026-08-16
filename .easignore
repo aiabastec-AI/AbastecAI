@@ -1,0 +1,22 @@
+# EAS empacota o monorepo inteiro a partir da raiz do git (não só app/),
+# então listamos aqui o que não é necessário pro build do app Expo.
+# EAS reinstala node_modules e regenera as pastas nativas na nuvem.
+
+# Outras partes do monorepo, não usadas pelo build do app/
+admin/
+supabase/
+scripts/
+assets/
+
+# Pastas locais geradas/pesadas dentro de app/ (cache Gradle/Kotlin, etc.)
+app/node_modules/
+app/android/
+app/ios/
+app/.expo/
+app/dist/
+app/web-build/
+
+# Artefatos de build baixados manualmente
+*.aab
+*.apk
+*.ipa
