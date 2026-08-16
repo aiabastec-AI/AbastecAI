@@ -416,7 +416,7 @@ O usuário quer manter `abastec-ai.vercel.app` reservado especificamente pro pai
 
 ### 14.7 O que ficou pra depois
 
-- [ ] **SHA-1 de produção na chave Android do Google Maps** — hoje só tem o SHA-1 de debug (ver 14.1); precisa do certificado de assinatura real (Play App Signing, via EAS) antes de publicar.
+- [x] **SHA-1 de produção na chave Android do Google Maps** — resolvida em 2026-08-16, ver 17.8. Chave `AbastecAI Android` agora aceita debug + produção lado a lado.
 - [ ] **Testar o mapa (Google Maps) num device físico** — só validado no emulador até agora; era o cenário que expunha o bug do Mapbox antigo.
 - [x] **Credenciais OAuth do Google** (Client ID/Secret) — configuradas em 2026-08-09, ver 14.6. Admin validado de ponta a ponta; app mobile validado até a tela do Google, falta só o fechamento do ciclo (deep link de volta) com uma conta real — aceito assim por decisão do usuário.
 - [x] **Confirmação de e-mail real** — resolvida em 2026-08-09 desativando e-mail/senha por completo (só Google), em vez de configurar SMTP. Ver 14.6.
@@ -561,6 +561,15 @@ Direto no `mapa.tsx`, sem rota nova: reaproveita o `<RotaOverlay>`/`DirectionsRe
 ### 17.8 O que ficou pra depois
 
 - [ ] Teste em device físico com GPS de verdade (emulador não tem GPS real — a validação foi com localização mockada/fixa do próprio emulador).
-- [ ] SHA-1 de produção na chave Android do Maps (pendência antiga, seção 7/14) — vai bloquear a Directions API especificamente numa build de release assinada, justamente onde a navegação importa mais.
+- [x] SHA-1 de produção na chave Android do Maps (pendência antiga, seção 7/14) — resolvida em 2026-08-16, ver seção 18.
 - [ ] Voz por padrão ligada ou com toggle — hoje sempre fala, sem opção de silenciar na UI.
 - **Não testado de ponta a ponta com uma conta real** (exigiria logar de verdade com Google no emulador, que nesta sessão nunca foi fechado até o fim — ver 14.6) — só a rejeição de chamada não-autenticada foi validada. Lógica segue o mesmo padrão comprovado de `sync-anp` (mesmo jeito de criar o client admin), risco residual é baixo, mas vale um teste real antes de publicar nas lojas.
+
+## 18. EAS Build de produção + SHA-1 do Maps (2026-08-16)
+
+- App vinculado ao projeto EAS (`scrindevai/abastecai`, package `com.abastecai.app`); `app/eas.json` ganhou os profiles `development`/`preview`/`production` e a raiz ganhou `.easignore` (exclui `admin/`, `supabase/`, cache local de `android/` do upload, pra acelerar).
+- Primeiro build de produção rodado (`eas build --platform android --profile production`) e concluído com sucesso — gerou o `.aab` (Android App Bundle). Baixado pelo usuário e guardado **fora do repositório**, em `G:\dev\AbastecAI-builds\android\` (binário de 74 MB, não faz sentido versionar — `*.aab`/`*.apk` adicionados ao `.gitignore`).
+- **Pendência antiga resolvida**: o keystore de produção gerado pela EAS (Play App Signing) tem um SHA-1 diferente do keystore de debug usado até aqui. Peguei o fingerprint pelo dashboard (`expo.dev/accounts/scrindevai/projects/abastecai/credentials` — o comando `eas credentials -p android` é um menu interativo que **não funciona neste ambiente**, nem via Bash nem via `!`, porque nenhum dos dois expõe um TTY real pro `eas-cli` capturar input) e atualizei a chave `AbastecAI Android` no GCP via `gcloud services api-keys update` com dois `--allowed-application` (debug + produção, mesmo package), mantendo os `apiTargets` (`maps-android-backend`, `directions-backend`) intactos — confirmado que `gcloud` faz merge por categoria de restrição, não substitui a chave inteira.
+- SHA-1 de debug: `5e8f16062ea3cd2c4a0d547876baa6f38cabf625`. SHA-1 de produção: `922d038683bb463e58bf8ab4924910984a8a0610`.
+- **Não testado ainda**: instalar esse `.aab` de verdade num device (ou emulador) e confirmar que o Maps/Directions funcionam com a assinatura de produção — só a config da chave foi validada, não uma chamada real assinada com esse certificado.
+- **Bloqueado no usuário**: conta do Google Play Console está em verificação — `eas submit` (envio automático pra loja) só pode ser configurado depois que a conta for aprovada e o app for criado lá.

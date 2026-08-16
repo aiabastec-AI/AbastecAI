@@ -11,3 +11,7 @@ node_modules
 
 # Dados brutos baixados manualmente pra backfill (grandes demais/não fazem sentido versionar)
 scripts/dados/
+
+# Builds baixados da EAS (binários grandes, não fazem sentido versionar)
+*.aab
+*.apk

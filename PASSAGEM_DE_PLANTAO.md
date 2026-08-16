@@ -53,6 +53,10 @@ Pendência antiga resolvida (ARQUITETURA.md seção 16): política de privacidad
 
 Pendência da entrada anterior resolvida (ARQUITETURA.md seção 17): navegação turn-by-turn completa, nativo e web, em 5 fases (dados/steps da Directions API → motor de progresso puro → tela nativa heading-up → overlay web north-up → voz TTS + ícones de manobra). Decisão técnica: nada de Google Navigation SDK (só existe pra mobile, web ficaria sem equivalente de qualquer jeito) — engine própria compartilhada, alimentada pela Directions API que os dois lados já usavam. Testado de ponta a ponta nos dois lados nesta sessão (emulador Android via build+instalação manual, web via Playwright headless com geolocalização mockada) — sem crash, banner de manobra/rodapé/recálculo funcionando. Duas dependências nativas novas: `expo-keep-awake`, `expo-speech` (ambas já rebuildadas e validadas no emulador).
 
+## Atualização — 2026-08-16 (EAS Build + SHA-1 de produção)
+
+Primeiro build de produção Android feito na EAS (detalhe em ARQUITETURA.md seção 18). O `.aab` gerado foi baixado e guardado fora do repo (`G:\dev\AbastecAI-builds\android\`, `*.aab`/`*.apk` agora no `.gitignore`). Pendência antiga resolvida: SHA-1 de produção do keystore da EAS registrado na chave `AbastecAI Android` do GCP (junto com o de debug, não substituiu). Conta do Google Play Console segue em verificação — `eas submit` automático fica pra quando ela for aprovada; por ora o `.aab` fica guardado esperando envio manual ou automático.
+
 ## O que falta (dá pra eu fazer sozinho, se pedirem)
 
 - Testar a exclusão de conta de ponta a ponta com uma conta Google real (logar no emulador → excluir → confirmar que sumiu do banco).
