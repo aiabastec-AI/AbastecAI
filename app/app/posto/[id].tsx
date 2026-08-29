@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -19,8 +19,9 @@ import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { SecaoPrecos } from "../../src/components/SecaoPrecos";
-import { AnelNota } from "../../src/components/AnelNota";
 import { PinMapa } from "../../src/components/PinMapa";
+import { NotaPin } from "../../src/components/NotaPin";
+import { SheetArrastavel } from "../../src/components/SheetArrastavel";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: [] };
@@ -164,7 +165,7 @@ export default function FichaPosto() {
         </View>
       </View>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.conteudo}>
+      <SheetArrastavel aoFechar={() => router.back()} estiloSheet={styles.sheet} estiloConteudo={styles.conteudo}>
         <View style={styles.handle} />
 
         <View style={styles.header}>
@@ -177,18 +178,7 @@ export default function FichaPosto() {
             {posto.bandeira && <Text style={styles.bandeira}>{posto.bandeira}</Text>}
           </View>
           {posto.nota_anp != null ? (
-            <View style={{ boxShadow: glowDaNota(posto.nota_anp, colors) }}>
-              <AnelNota
-                nota={posto.nota_anp}
-                tamanho={68}
-                corProgresso={corNota}
-                corTrilho={colors.border}
-              >
-                <Text style={[styles.notaTexto, { color: colors.textPrimary }]}>
-                  {posto.nota_anp.toFixed(1)}
-                </Text>
-              </AnelNota>
-            </View>
+            <NotaPin nota={posto.nota_anp} cor={corNota} tamanho={68} />
           ) : (
             <View style={styles.notaIndisponivel}>
               <MaterialCommunityIcons name="shield-search" size={22} color={colors.textSecondary} />
@@ -325,7 +315,7 @@ export default function FichaPosto() {
         </Pressable>
 
         <SecaoAvaliacoes alvo={{ tipo: "posto", id: posto.id }} />
-      </ScrollView>
+      </SheetArrastavel>
     </View>
   );
 }
@@ -406,7 +396,6 @@ function criarEstilos(colors: ThemeColors) {
       badgePatrocinado: { ...tipografia.labelCaps, color: colors.notaMedia, fontSize: 10 },
       nome: { ...tipografia.headlineLgMobile, color: colors.textPrimary },
       bandeira: { ...tipografia.bodySm, color: colors.textSecondary },
-      notaTexto: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 20 },
       notaIndisponivel: {
         width: 72,
         height: 72,

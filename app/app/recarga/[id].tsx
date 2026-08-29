@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -14,6 +14,7 @@ import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { PinMapa } from "../../src/components/PinMapa";
+import { SheetArrastavel } from "../../src/components/SheetArrastavel";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 function iconeConector(tipo: string): ComponentProps<typeof MaterialCommunityIcons>["name"] {
@@ -156,7 +157,7 @@ export default function FichaRecarga() {
         </View>
       </View>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.conteudo}>
+      <SheetArrastavel aoFechar={() => router.back()} estiloSheet={styles.sheet} estiloConteudo={styles.conteudo}>
         <View style={styles.handle} />
 
         <View style={styles.header}>
@@ -288,7 +289,7 @@ export default function FichaRecarga() {
         )}
 
         <SecaoAvaliacoes alvo={{ tipo: "recarga", id: ponto.id }} />
-      </ScrollView>
+      </SheetArrastavel>
     </View>
   );
 }
