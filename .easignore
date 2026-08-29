@@ -2,11 +2,13 @@
 # então listamos aqui o que não é necessário pro build do app Expo.
 # EAS reinstala node_modules e regenera as pastas nativas na nuvem.
 
-# Outras partes do monorepo, não usadas pelo build do app/
+# Outras partes do monorepo, não usadas pelo build do app/ — barra inicial ancora
+# na raiz do repo, senão "assets/" também bateria (recursivamente) com app/assets/
+# e apagaria os ícones reais do app do pacote enviado pra build (ENOENT no prebuild).
 admin/
 supabase/
 scripts/
-assets/
+/assets/
 
 # Pastas locais geradas/pesadas dentro de app/ (cache Gradle/Kotlin, etc.)
 app/node_modules/
