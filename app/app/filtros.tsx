@@ -7,6 +7,7 @@ import { useTheme } from "../src/lib/ThemeProvider";
 import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { PillToggle } from "../src/components/PillToggle";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Precisa bater com os valores de ConnectionType.Title que a Open Charge Map devolve
 // (ver supabase/functions/sync-ocm) — senão o filtro não casa com nada no banco.
@@ -18,7 +19,8 @@ export default function Filtros() {
   const router = useRouter();
   const { notaMinima, setNotaMinima, conectoresAtivos, setConectoresAtivos } = useFiltros();
   const { colors } = useTheme();
-  const styles = useMemo(() => criarEstilos(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
 
   function alternarConector(conector: string) {
     setConectoresAtivos(
@@ -92,9 +94,15 @@ export default function Filtros() {
   );
 }
 
-function criarEstilos(colors: ThemeColors) {
+function criarEstilos(colors: ThemeColors, insetInferior: number) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: 24, gap: 24 },
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: 24,
+      paddingBottom: 24 + insetInferior,
+      gap: 24,
+    },
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     secao: { gap: 12 },

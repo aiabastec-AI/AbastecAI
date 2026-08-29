@@ -49,6 +49,20 @@ function zoomDoDelta(deltaLongitude: number): number {
   return Math.log2(360 / deltaLongitude);
 }
 
+// "Ver N" precisa refletir o que está literalmente enquadrado na câmera, não o raio de
+// busca (que é sempre maior que a tela, de propósito, pra não precisar re-buscar a cada
+// pequeno arrasto — ver raioBuscaM abaixo).
+function dentroDaRegiao(lat: number, lng: number, regiao: Region): boolean {
+  const meioLat = regiao.latitudeDelta / 2;
+  const meioLng = regiao.longitudeDelta / 2;
+  return (
+    lat >= regiao.latitude - meioLat &&
+    lat <= regiao.latitude + meioLat &&
+    lng >= regiao.longitude - meioLng &&
+    lng <= regiao.longitude + meioLng
+  );
+}
+
 function raioBuscaM(zoom: number, lat: number): number {
   const metrosPorPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
   const raio = metrosPorPixel * 700;
@@ -69,6 +83,7 @@ type ItemMapa = {
   patrocinado: boolean;
   latitude: number;
   longitude: number;
+  nota: number | null;
 };
 
 export default function MapaScreen() {
@@ -90,7 +105,9 @@ export default function MapaScreen() {
   // sem precisar mover o mapa nem pegar a localização de novo.
   const centroAtualRef = useRef({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
   const zoomAtualRef = useRef(12);
+  const requisicaoAtualRef = useRef(0);
   const [mostrarListaProximos, setMostrarListaProximos] = useState(false);
+  const [regiaoVisivel, setRegiaoVisivel] = useState<Region>(REGIAO_INICIAL);
 
   // Onboarding (PRD 5.1): pede localização no início, com fallback de digitar cidade.
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
@@ -101,6 +118,7 @@ export default function MapaScreen() {
 
   const carregarDados = useCallback(
     async (lat: number, lng: number) => {
+      const idRequisicao = ++requisicaoAtualRef.current;
       centroAtualRef.current = { lat, lng };
       setCarregando(true);
       setErro(null);
@@ -110,6 +128,11 @@ export default function MapaScreen() {
           buscarPostosProximos(lat, lng, raioM, notaMinima),
           buscarPontosRecargaProximos(lat, lng, raioM, conectoresAtivos),
         ]);
+        // Arrastar o mapa dispara uma busca a cada mudança de região — se essa resposta
+        // não for mais a mais recente (uma busca mais nova já foi disparada), descarta:
+        // senão uma resposta antiga que chega atrasada sobrescreve dados já atualizados,
+        // fazendo pins "piscarem"/sumirem e reaparecerem por conta de fora de ordem.
+        if (idRequisicao !== requisicaoAtualRef.current) return;
         setPostos(postosResultado);
         setPontosRecarga(recargaResultado);
         // Não bloqueia a tela se isso falhar — patrocínio é um extra visual, não dado essencial.
@@ -120,6 +143,7 @@ export default function MapaScreen() {
           .then(setPatrocinados)
           .catch(() => {});
       } catch (e) {
+        if (idRequisicao !== requisicaoAtualRef.current) return;
         // erros do supabase-js (PostgrestError) não são instanceof Error, só têm .message
         const mensagem = (e as { message?: string })?.message || "Falha ao carregar dados do mapa.";
         console.error("Erro ao carregar dados do mapa:", e);
@@ -207,6 +231,7 @@ export default function MapaScreen() {
 
   function aoRegiaoMudar(regiao: Region) {
     zoomAtualRef.current = zoomDoDelta(regiao.longitudeDelta);
+    setRegiaoVisivel(regiao);
     carregarDados(regiao.latitude, regiao.longitude);
   }
 
@@ -229,6 +254,7 @@ export default function MapaScreen() {
           patrocinado: patrocinados.has(p.id),
           latitude: p.latitude,
           longitude: p.longitude,
+          nota: p.nota_anp,
         });
       }
     }
@@ -241,6 +267,7 @@ export default function MapaScreen() {
           patrocinado: patrocinados.has(p.id),
           latitude: p.latitude,
           longitude: p.longitude,
+          nota: null,
         });
       }
     }
@@ -256,8 +283,11 @@ export default function MapaScreen() {
         ? pontosRecarga.map((dado): ItemProximo => ({ tipo: "recarga", dado }))
         : []),
     ];
-    return itens.sort((a, b) => a.dado.distancia_m - b.dado.distancia_m).slice(0, 20);
-  }, [postos, pontosRecarga, mostrarCombustivel, mostrarEletrico]);
+    return itens
+      .filter((item) => dentroDaRegiao(item.dado.latitude, item.dado.longitude, regiaoVisivel))
+      .sort((a, b) => a.dado.distancia_m - b.dado.distancia_m)
+      .slice(0, 20);
+  }, [postos, pontosRecarga, mostrarCombustivel, mostrarEletrico, regiaoVisivel]);
 
   return (
     <View style={styles.container}>
@@ -275,7 +305,10 @@ export default function MapaScreen() {
         onRegionChangeComplete={aoRegiaoMudar}
         showsUserLocation
         showsMyLocationButton={false}
-        radius={50}
+        radius={30}
+        // maxZoom baixo de propósito: só agrupa em zoom bem afastado (visão de região/cidade
+        // inteira); assim que a pessoa começa a dar zoom in, mostra cada pin separado.
+        maxZoom={10}
         clusterColor={colors.textPrimary}
         clusterTextColor={colors.background}
         clusterFontFamily="Inter_600SemiBold"
@@ -284,17 +317,11 @@ export default function MapaScreen() {
           <Marker
             key={`${item.tipo}-${item.id}`}
             coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-            tracksViewChanges={false}
             onPress={() =>
               router.push(item.tipo === "posto" ? `/posto/${item.id}` : `/recarga/${item.id}`)
             }
           >
-            <PinMapa
-              cor={item.cor}
-              patrocinado={item.patrocinado}
-              tipo={item.tipo}
-              nota={item.tipo === "posto" ? postos.find((p) => p.id === item.id)?.nota_anp : null}
-            />
+            <PinMapa cor={item.cor} patrocinado={item.patrocinado} tipo={item.tipo} nota={item.nota} />
           </Marker>
         ))}
       </ClusteredMapView>

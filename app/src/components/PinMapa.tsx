@@ -26,7 +26,6 @@ export function PinMapa({
             height: corpo,
             borderRadius: corpo / 2,
             borderColor: patrocinado ? "#F5A623" : cor,
-            boxShadow: `0px 0px 16px ${cor}88`,
           },
         ]}
       >
@@ -42,7 +41,7 @@ export function PinMapa({
           />
         )}
       </View>
-      <View style={[styles.haste, { backgroundColor: cor, boxShadow: `0px 0px 8px ${cor}88` }]} />
+      <View style={[styles.haste, { backgroundColor: cor }]} />
     </View>
   );
 }
