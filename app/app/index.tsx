@@ -292,6 +292,14 @@ export default function MapaScreen() {
   return (
     <View style={styles.container}>
       <ClusteredMapView
+        // A lib (react-native-map-clustering) reassocia markers ao array de dados por
+        // ÍNDICE, não pela nossa key — quando a quantidade de pins muda bastante (ex.:
+        // trocar de "Combustível" pra "Elétrico") ela não limpa direito os markers antigos,
+        // ficando pins acumulados de tipos diferentes. Forçar remontagem completa via `key`
+        // toda vez que o filtro muda é o jeito confiável de resetar o estado interno dela;
+        // `initialRegion` usa a última posição conhecida da câmera (não a inicial fixa) pra
+        // não "pular" de volta pro centro padrão nesse remount.
+        key={modo}
         style={styles.map}
         // O .d.ts do react-native-map-clustering declara `mapRef` como recebendo um
         // React.Ref<MapView> (bug de tipagem da lib — a instância real é o que vem em
@@ -301,7 +309,7 @@ export default function MapaScreen() {
         }}
         provider={PROVIDER_GOOGLE}
         customMapStyle={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
-        initialRegion={REGIAO_INICIAL}
+        initialRegion={regiaoVisivel}
         onRegionChangeComplete={aoRegiaoMudar}
         showsUserLocation
         showsMyLocationButton={false}
