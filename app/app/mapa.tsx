@@ -414,12 +414,13 @@ export default function MapaWebScreen() {
     const itens: ItemMapa[] = [];
     if (mostrarCombustivel) {
       for (const p of postos) {
+        const patrocinado = patrocinados.has(p.id);
         itens.push({
           id: p.id,
           tipo: "posto",
           cor: corDaNota(p.nota_anp, colors),
-          texto: p.nota_anp != null ? p.nota_anp.toFixed(1) : undefined,
-          patrocinado: patrocinados.has(p.id),
+          texto: p.nota_anp != null ? p.nota_anp.toFixed(1) : patrocinado ? "★" : "⛽",
+          patrocinado,
           latitude: p.latitude,
           longitude: p.longitude,
         });
