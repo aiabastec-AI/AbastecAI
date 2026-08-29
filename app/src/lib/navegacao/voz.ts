@@ -6,17 +6,23 @@ import * as Speech from "expo-speech";
 // quando o passo atual muda ou quando `reiniciar()` é chamado manualmente (recálculo de rota).
 const LIMIARES_M = [200, 30] as const;
 
-export function criarGuiaDeVoz() {
+export function criarGuiaDeVoz(vozAtivaInicial = true) {
   let indicePassoAtual = -1;
   let limiaresAnunciados = new Set<number>();
+  let vozAtiva = vozAtivaInicial;
 
   function reiniciar() {
     indicePassoAtual = -1;
     limiaresAnunciados = new Set();
   }
 
+  function definirAtiva(valor: boolean) {
+    vozAtiva = valor;
+    if (!valor) Speech.stop();
+  }
+
   function falarSeNecessario(indicePasso: number, distanciaMetros: number, instrucao: string) {
-    if (!instrucao) return;
+    if (!instrucao || !vozAtiva) return;
     if (indicePasso !== indicePassoAtual) {
       indicePassoAtual = indicePasso;
       limiaresAnunciados = new Set();
@@ -34,9 +40,10 @@ export function criarGuiaDeVoz() {
   }
 
   function falarChegada(nomeDestino?: string) {
+    if (!vozAtiva) return;
     Speech.stop();
     Speech.speak(`Você chegou${nomeDestino ? ` a ${nomeDestino}` : " ao destino"}`, { language: "pt-BR" });
   }
 
-  return { falarSeNecessario, falarChegada, reiniciar };
+  return { falarSeNecessario, falarChegada, reiniciar, definirAtiva };
 }

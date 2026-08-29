@@ -21,6 +21,7 @@ import {
 import { BannerManobra } from "../src/components/BannerManobra";
 import { RodapeNavegacao } from "../src/components/RodapeNavegacao";
 import { criarGuiaDeVoz } from "../src/lib/navegacao/voz";
+import { carregarVozAtiva, salvarVozAtiva } from "../src/lib/preferencias";
 
 // Distância mínima percorrida entre dois fixos de GPS pra recalcular o rumo (heading-up da
 // câmera) — abaixo disso o vetor entre os pontos é só ruído de GPS, não movimento de verdade,
@@ -57,6 +58,14 @@ export default function TelaNavegacao() {
   const [rota, setRota] = useState<RotaCalculada | null>(null);
   const [progresso, setProgresso] = useState<ProgressoNavegacao | null>(null);
   const [chegou, setChegou] = useState(false);
+  const [vozAtiva, setVozAtiva] = useState(true);
+
+  function alternarVoz() {
+    const novoValor = !vozAtiva;
+    setVozAtiva(novoValor);
+    guiaVozRef.current.definirAtiva(novoValor);
+    salvarVozAtiva(novoValor);
+  }
 
   function definirRota(novaRota: RotaCalculada) {
     rotaRef.current = novaRota;
@@ -137,6 +146,11 @@ export default function TelaNavegacao() {
 
     async function iniciar() {
       try {
+        const vozSalva = await carregarVozAtiva();
+        if (cancelado) return;
+        setVozAtiva(vozSalva);
+        guiaVozRef.current.definirAtiva(vozSalva);
+
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           if (!cancelado) setErro("Preciso da sua localização pra navegar.");
@@ -250,12 +264,26 @@ export default function TelaNavegacao() {
 
       {!chegou && (
         <View style={styles.bannerWrapper}>
-          <BannerManobra
-            manobra={passoParaExibir?.manobra}
-            instrucao={passoParaExibir?.instrucao}
-            distanciaMetros={distanciaAteManobra}
-            corAcento={corAcento}
-          />
+          <View style={{ flex: 1 }}>
+            <BannerManobra
+              manobra={passoParaExibir?.manobra}
+              instrucao={passoParaExibir?.instrucao}
+              distanciaMetros={distanciaAteManobra}
+              corAcento={corAcento}
+            />
+          </View>
+          <Pressable
+            style={styles.botaoVoz}
+            onPress={alternarVoz}
+            accessibilityRole="button"
+            accessibilityLabel={vozAtiva ? "Silenciar guia por voz" : "Ativar guia por voz"}
+          >
+            <MaterialCommunityIcons
+              name={vozAtiva ? "volume-high" : "volume-off"}
+              size={22}
+              color={colors.textPrimary}
+            />
+          </Pressable>
         </View>
       )}
 
@@ -287,7 +315,25 @@ function criarEstilos(colors: ThemeColors) {
     textoErro: { ...tipografia.bodyMd, color: colors.textSecondary, textAlign: "center" },
     botao: { borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, alignItems: "center" },
     botaoTexto: { color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 16 },
-    bannerWrapper: { position: "absolute", top: 56, left: 16, right: 16 },
+    bannerWrapper: {
+      position: "absolute",
+      top: 56,
+      left: 16,
+      right: 16,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    botaoVoz: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+    },
     rodapeWrapper: { position: "absolute", left: 16, right: 16, bottom: 40 },
     avisoRecalculo: {
       position: "absolute",
