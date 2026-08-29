@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { corDaNota, glowDaNota, type ThemeColors } from "../theme";
+import { corDaNota, type ThemeColors } from "../theme";
 import { useTheme } from "../lib/ThemeProvider";
 import { tipografia } from "../typography";
 import {
@@ -12,7 +12,7 @@ import {
 import { BotaoFavorito } from "./BotaoFavorito";
 import { SecaoAvaliacoes } from "./SecaoAvaliacoes";
 import { SecaoPrecos } from "./SecaoPrecos";
-import { AnelNota } from "./AnelNota";
+import { NotaPin } from "./NotaPin";
 import { buscarIdsPatrocinados } from "../lib/patrocinios";
 
 const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: [] };
@@ -93,18 +93,7 @@ export function FichaPosto({
       <View style={styles.header}>
         <Text style={styles.nome}>{nome}</Text>
         {posto.nota_anp != null ? (
-          <View style={{ boxShadow: glowDaNota(posto.nota_anp, colors) }}>
-            <AnelNota
-              nota={posto.nota_anp}
-              tamanho={64}
-              corProgresso={corDaNota(posto.nota_anp, colors)}
-              corTrilho={colors.border}
-            >
-              <Text style={[styles.notaTexto, { color: colors.textPrimary }]}>
-                {posto.nota_anp.toFixed(1)}
-              </Text>
-            </AnelNota>
-          </View>
+          <NotaPin nota={posto.nota_anp} cor={corDaNota(posto.nota_anp, colors)} tamanho={64} />
         ) : (
           // nota_anp só fica null quando não existe nenhuma fiscalização/amostra nos
           // últimos 5 anos (ver recalcular_nota_anp) — texto explícito pra não parecer
@@ -226,7 +215,6 @@ function criarEstilos(colors: ThemeColors) {
     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     nome: { ...tipografia.headlineLgMobile, color: colors.textPrimary, flexShrink: 1 },
     notaBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16 },
-    notaTexto: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 20 },
     notaIndisponivelTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 12 },
     resumoTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 12 },
     bandeira: { color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 14 },

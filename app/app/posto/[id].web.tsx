@@ -14,7 +14,7 @@ import {
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
-import { AnelNota } from "../../src/components/AnelNota";
+import { NotaPin } from "../../src/components/NotaPin";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
 
 // Contraparte ".web.tsx" de posto/[id].tsx — o Expo Router prioriza este arquivo no build
@@ -121,18 +121,7 @@ export default function FichaPosto() {
             {posto.bandeira && <Text style={styles.bandeira}>{posto.bandeira}</Text>}
           </View>
           {posto.nota_anp != null ? (
-            <View style={{ boxShadow: glowDaNota(posto.nota_anp, colors) }}>
-              <AnelNota
-                nota={posto.nota_anp}
-                tamanho={68}
-                corProgresso={corNota}
-                corTrilho={colors.border}
-              >
-                <Text style={[styles.notaTexto, { color: colors.textPrimary }]}>
-                  {posto.nota_anp.toFixed(1)}
-                </Text>
-              </AnelNota>
-            </View>
+            <NotaPin nota={posto.nota_anp} cor={corNota} tamanho={68} />
           ) : (
             <View style={styles.notaIndisponivel}>
               <MaterialCommunityIcons name="shield-search" size={22} color={colors.textSecondary} />
@@ -316,7 +305,6 @@ function criarEstilos(colors: ThemeColors) {
       badgePatrocinado: { ...tipografia.labelCaps, color: colors.notaMedia, fontSize: 10 },
       nome: { ...tipografia.headlineLgMobile, color: colors.textPrimary },
       bandeira: { ...tipografia.bodySm, color: colors.textSecondary },
-      notaTexto: { fontFamily: "SpaceGrotesk_700Bold", fontSize: 20 },
       notaIndisponivel: {
         width: 72,
         height: 72,
