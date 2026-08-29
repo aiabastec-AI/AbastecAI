@@ -37,12 +37,21 @@ import { PinMapa } from "../src/components/PinMapa";
 // Centro inicial: São Paulo, onde a primeira sincronização da ANP rodou (ver ARQUITETURA.md).
 const CENTRO_INICIAL_LAT = -23.5505;
 const CENTRO_INICIAL_LNG = -46.6333;
-const RAIO_BUSCA_M = 15000;
 
 // Google Maps trabalha com "region" (delta em graus de latitude/longitude visíveis),
 // não zoom level direto como o Mapbox — essa é a conversão aproximada padrão.
 function deltaDoZoom(zoom: number): number {
   return 360 / Math.pow(2, zoom);
+}
+
+function zoomDoDelta(deltaLongitude: number): number {
+  return Math.log2(360 / deltaLongitude);
+}
+
+function raioBuscaM(zoom: number, lat: number): number {
+  const metrosPorPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+  const raio = metrosPorPixel * 700;
+  return Math.round(Math.min(Math.max(raio, 3000), 150000));
 }
 
 const REGIAO_INICIAL: Region = {
@@ -78,6 +87,8 @@ export default function MapaScreen() {
   // Guarda o último centro consultado pra poder recarregar quando o filtro muda,
   // sem precisar mover o mapa nem pegar a localização de novo.
   const centroAtualRef = useRef({ lat: CENTRO_INICIAL_LAT, lng: CENTRO_INICIAL_LNG });
+  const zoomAtualRef = useRef(12);
+  const [mostrarListaProximos, setMostrarListaProximos] = useState(false);
 
   // Onboarding (PRD 5.1): pede localização no início, com fallback de digitar cidade.
   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
@@ -92,9 +103,10 @@ export default function MapaScreen() {
       setCarregando(true);
       setErro(null);
       try {
+        const raioM = raioBuscaM(zoomAtualRef.current, lat);
         const [postosResultado, recargaResultado] = await Promise.all([
-          buscarPostosProximos(lat, lng, RAIO_BUSCA_M, notaMinima),
-          buscarPontosRecargaProximos(lat, lng, RAIO_BUSCA_M, conectoresAtivos),
+          buscarPostosProximos(lat, lng, raioM, notaMinima),
+          buscarPontosRecargaProximos(lat, lng, raioM, conectoresAtivos),
         ]);
         setPostos(postosResultado);
         setPontosRecarga(recargaResultado);
@@ -124,6 +136,7 @@ export default function MapaScreen() {
   }, [carregarDados]);
 
   function irParaCoordenada(lat: number, lng: number, zoomLevel: number) {
+    zoomAtualRef.current = zoomLevel;
     const delta = deltaDoZoom(zoomLevel);
     mapRef.current?.animateToRegion(
       { latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta },
@@ -191,6 +204,7 @@ export default function MapaScreen() {
   }
 
   function aoRegiaoMudar(regiao: Region) {
+    zoomAtualRef.current = zoomDoDelta(regiao.longitudeDelta);
     carregarDados(regiao.latitude, regiao.longitude);
   }
 
@@ -345,7 +359,7 @@ export default function MapaScreen() {
         )}
       </View>
 
-      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+      {!mostrarOnboarding && mostrarListaProximos && resultadosProximos.length > 0 && (
         <FlatList
           style={styles.listaProximos}
           contentContainerStyle={styles.listaProximosConteudo}
@@ -364,6 +378,24 @@ export default function MapaScreen() {
             />
           )}
         />
+      )}
+
+      {!mostrarOnboarding && resultadosProximos.length > 0 && (
+        <Pressable
+          style={styles.alcaLista}
+          onPress={() => setMostrarListaProximos((valor) => !valor)}
+          accessibilityRole="button"
+          accessibilityLabel={mostrarListaProximos ? "Esconder lista de próximos" : "Ver lista de próximos"}
+        >
+          <MaterialCommunityIcons
+            name={mostrarListaProximos ? "chevron-down" : "chevron-up"}
+            size={20}
+            color={colors.textPrimary}
+          />
+          <Text style={styles.alcaListaTexto}>
+            {mostrarListaProximos ? "Esconder" : `Ver ${resultadosProximos.length}`}
+          </Text>
+        </Pressable>
       )}
 
       <Pressable
@@ -558,12 +590,30 @@ function criarEstilos(colors: ThemeColors) {
       position: "absolute",
       left: 0,
       right: 0,
-      bottom: 112,
+      bottom: 76,
     },
     listaProximosConteudo: {
       paddingHorizontal: 16,
       gap: 12,
     },
+    alcaLista: {
+      position: "absolute",
+      left: "50%",
+      marginLeft: -75,
+      bottom: 24,
+      width: 150,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: colors.surfaceGlass,
+      borderWidth: 1,
+      borderColor: colors.surfaceGlassBorder,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    alcaListaTexto: { color: colors.textPrimary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
     onboardingOverlay: {
       position: "absolute",
       top: 0,

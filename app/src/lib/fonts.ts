@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useFonts } from "expo-font";
 import {
   SpaceGrotesk_500Medium,
@@ -11,7 +12,8 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from "@expo-goog
 // via useFonts (expo-font já vem linkado nativamente pelo @expo/vector-icons, então
 // isso não exige rebuild do dev client) — sem plugin de config nem splash screen própria.
 export function useFontesCarregadas() {
-  const [carregadas] = useFonts({
+  const [fallbackAtivo, setFallbackAtivo] = useState(false);
+  const [carregadas, erro] = useFonts({
     SpaceGrotesk_500Medium,
     SpaceGrotesk_600SemiBold,
     SpaceGrotesk_700Bold,
@@ -19,5 +21,11 @@ export function useFontesCarregadas() {
     Inter_500Medium,
     Inter_600SemiBold,
   });
-  return carregadas;
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setFallbackAtivo(true), 3000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return carregadas || erro != null || fallbackAtivo;
 }
