@@ -73,6 +73,22 @@ Duas pendências antigas fechadas de vez (detalhe técnico completo em ARQUITETU
 - Feature de foto enviada por usuário (se o usuário confirmar que quer essa via).
 - Push notifications de verdade, confirmação de e-mail (isso último ficou sem sentido agora que só tem login Google — provavelmente pode ser riscado da lista de pendências).
 
+## Atualização — 2026-08-29 (crash de produção + fixes de mapa/UI + reenvio à loja)
+
+Pendência crítica achada e resolvida (detalhe técnico completo em ARQUITETURA.md seção 19): o `.aab` que estava publicado na faixa de teste fechado do Play Console (o de 2026-08-16, já aprovada pelo Google) **crashava assim que abria** — nunca tinha sido testado de verdade num device físico antes. Causa dupla: variáveis de ambiente do Supabase nunca configuradas na EAS (só existiam no `.env.local` local, que o worker de build na nuvem não enxerga) + um bug no `.easignore` (`assets/` sem barra inicial excluindo `app/assets/` inteiro, junto com a pasta de marketing da raiz) que quebrava o `expo prebuild`.
+
+No processo de testar no device físico (Samsung Galaxy A56 real, conectado por `adb`, GPS real em Araraquara), apareceram e foram corrigidos vários bugs reais de UI/mapa reportados pelo usuário ao vivo: toggle Combustível/Elétrico/Ambos com texto cortado e contraste ruim, pins sem nota quase invisíveis (cor `#4A5058` contra o fundo escuro do próprio pin), sombra quadrada nos pins em zoom alto, clustering agrupando cedo demais, "Ver N" sempre mostrando até 20 mesmo com poucos pins na tela, botões cobertos pela barra de gestos do Android (mapa e filtros), e — o mais sério — **pins de um filtro não sumiam ao trocar pra outro filtro** (ex.: pins de posto continuavam visíveis com "Elétrico" selecionado), causado por uma limitação de design da lib `react-native-map-clustering` (reassocia markers por índice de array, não por key). Resolvido forçando remontagem do mapa (`key={modo}`) a cada troca de filtro. Também implementado: gesto de arrastar a ficha do posto/recarga pra baixo pra fechar (`SheetArrastavel.tsx`, novo), toggle de mudo na navegação por voz (pendência antiga), e trocada a senha fraca do admin master (a conta real é `admin.teste@abastecai.dev`, não `aiabastec@gmail.com` como a doc antiga citava).
+
+Gerado o `.aab` final (versionCode 6) com tudo testado ao vivo antes — está em `G:\dev\AbastecAI-builds\android\abastecai-production-v6-final.aab`, fora do repo. Também tirados e commitados 9 screenshots novos em `app/assets/marketing/` pra usar na ficha da loja.
+
+## O que falta (bloqueado no usuário)
+
+1. **Subir o `.aab` do versionCode 6 no Play Console**, faixa de teste fechado — é isso que resolve o crash pros testadores de verdade (o que está lá hoje é o velho, versionCode 1). Nome/notas de versão sugeridos já passados no chat.
+2. Faixa de teste fechado está "Em análise" pelo Google desde 2026-08-29 — fora do nosso controle, só esperar.
+3. Itens antigos que já não fazem mais sentido reabrir sem pedido explícito: os 106 pontos de recarga com `cidade` nula e os 3 pontos de Araraquara faltantes na OCM (usuário decidiu não fazer cadastro manual desses 3).
+4. Ainda não testado: rota/navegação em device físico com GPS real *em movimento* (só testado parado, localização única) — GPS fixo já validado nesta sessão e nas anteriores.
+5. `eas submit` (envio automático pra loja) segue não configurado — todo envio é manual.
+
 ## Ambiente no fim da sessão
 
 - App público (`https://app-two-wine-64.vercel.app`) com deploy automático a cada push — **as mudanças desta sessão (navegação turn-by-turn) ainda não foram commitadas nem enviadas**, só testadas localmente (emulador + `expo start --web` na porta 8081).
