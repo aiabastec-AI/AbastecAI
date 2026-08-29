@@ -1249,18 +1249,32 @@ function ToggleItem({
         ativo && glow ? { boxShadow: glow } : null,
       ]}
     >
-      <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
-      {label && (
-        <Text style={[stylesToggle.label, { color: ativo ? corIcone : "#BACAC6" }]}>{label}</Text>
-      )}
+      {/* overflow: hidden nesse wrapper interno, não no Pressable — senão cortaria o
+          próprio boxShadow (glow) do item ativo junto com o texto que não coubesse. */}
+      <View style={stylesToggle.conteudo}>
+        <MaterialCommunityIcons name={icone} size={16} color={corIcone} />
+        {label && (
+          <Text style={[stylesToggle.label, { color: corIcone }]} numberOfLines={1}>
+            {label}
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 }
 
 const stylesToggle = StyleSheet.create({
+  conteudo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    overflow: "hidden",
+    maxWidth: "100%",
+  },
   label: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 11,
+    flexShrink: 1,
   },
 });
 
@@ -1294,8 +1308,8 @@ function criarEstilos(colors: ThemeColors) {
     toggleItem: {
       flex: 1,
       flexDirection: "row",
-      gap: 6,
       paddingVertical: 10,
+      paddingHorizontal: 3,
       borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",

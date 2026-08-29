@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import { FiltrosContext } from "../src/lib/filtros";
@@ -24,15 +25,17 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AuthProvider>
-          <FiltrosContext.Provider
-            value={{ notaMinima, setNotaMinima, conectoresAtivos, setConectoresAtivos }}
-          >
-            <Navegacao />
-          </FiltrosContext.Provider>
-        </AuthProvider>
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <FiltrosContext.Provider
+              value={{ notaMinima, setNotaMinima, conectoresAtivos, setConectoresAtivos }}
+            >
+              <Navegacao />
+            </FiltrosContext.Provider>
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

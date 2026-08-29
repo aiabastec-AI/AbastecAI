@@ -33,6 +33,7 @@ import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { PinMapa } from "../src/components/PinMapa";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Centro inicial: São Paulo, onde a primeira sincronização da ANP rodou (ver ARQUITETURA.md).
 const CENTRO_INICIAL_LAT = -23.5505;
@@ -73,7 +74,8 @@ type ItemMapa = {
 export default function MapaScreen() {
   const router = useRouter();
   const { colors, modo: modoTema } = useTheme();
-  const styles = useMemo(() => criarEstilos(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
   // react-native-map-clustering envolve o MapView nativo — o ref direto (animateToRegion
   // etc.) sai pela prop `mapRef`, não pelo `ref` do componente wrapper.
   const mapRef = useRef<MapView | null>(null);
@@ -476,9 +478,6 @@ function ToggleItem({
   return (
     <Pressable
       onPress={onPress}
-      // Só ícone visível de propósito (regra do redesign) — o mockup do Stitch mostra
-      // esse toggle com texto ao lado, mas o app mantém ícone-apenas; label só existe
-      // pra acessibilidade.
       accessibilityLabel={label}
       accessibilityRole="button"
       style={[
@@ -487,20 +486,34 @@ function ToggleItem({
         ativo && glow ? { boxShadow: glow } : null,
       ]}
     >
-      <MaterialCommunityIcons name={icone} size={20} color={corIcone} />
-      <Text style={[stylesToggle.label, { color: ativo ? corIcone : "#BACAC6" }]}>{label}</Text>
+      {/* overflow: hidden fica nesse wrapper interno, não no Pressable — senão cortaria
+          o próprio boxShadow (glow) do item ativo junto com o texto que não coubesse. */}
+      <View style={stylesToggle.conteudo}>
+        <MaterialCommunityIcons name={icone} size={16} color={corIcone} />
+        <Text style={[stylesToggle.label, { color: corIcone }]} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
 
 const stylesToggle = StyleSheet.create({
+  conteudo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    overflow: "hidden",
+    maxWidth: "100%",
+  },
   label: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 11,
+    flexShrink: 1,
   },
 });
 
-function criarEstilos(colors: ThemeColors) {
+function criarEstilos(colors: ThemeColors, insetInferior: number) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     map: { flex: 1 },
@@ -542,8 +555,8 @@ function criarEstilos(colors: ThemeColors) {
     toggleItem: {
       flex: 1,
       flexDirection: "row",
-      gap: 6,
       paddingVertical: 10,
+      paddingHorizontal: 3,
       borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
@@ -577,7 +590,7 @@ function criarEstilos(colors: ThemeColors) {
     fab: {
       position: "absolute",
       right: 16,
-      bottom: 42,
+      bottom: 42 + insetInferior,
       width: 52,
       height: 52,
       borderRadius: 26,
@@ -590,7 +603,7 @@ function criarEstilos(colors: ThemeColors) {
       position: "absolute",
       left: 0,
       right: 0,
-      bottom: 76,
+      bottom: 76 + insetInferior,
     },
     listaProximosConteudo: {
       paddingHorizontal: 16,
@@ -600,7 +613,7 @@ function criarEstilos(colors: ThemeColors) {
       position: "absolute",
       left: "50%",
       marginLeft: -75,
-      bottom: 24,
+      bottom: 24 + insetInferior,
       width: 150,
       flexDirection: "row",
       alignItems: "center",

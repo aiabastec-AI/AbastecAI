@@ -33,7 +33,10 @@ const marcaENota = {
   notaBaixa: "#E5484D",
   notaMedia: "#F5A623",
   notaAlta: "#3DD68C",
-  notaIndisponivel: "#4A5058",
+  // Precisa de bom contraste contra o fundo fixo do pin (#171A1F, ver PinMapa.tsx/pinSvg.ts)
+  // — não muda por tema porque o pin em si não muda. O valor anterior (#4A5058) era escuro
+  // demais nesse fundo, deixando o pin praticamente ilegível para postos sem nota_anp.
+  notaIndisponivel: "#9AA1AB",
 };
 
 // Glow é sempre a mesma "receita" (0 0 <blur> <cor+alpha>) nas duas cores de marca e nas
