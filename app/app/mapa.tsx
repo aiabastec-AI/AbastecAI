@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps 
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -101,6 +102,8 @@ type ItemMapa = {
 };
 
 export default function MapaWebScreen() {
+  const { session } = useAuth();
+  const avatarGoogle = session?.user.user_metadata?.avatar_url as string | undefined;
   const { colors, modo: modoTema } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [modo, setModo] = useState<ModoMapa>("ambos");
@@ -570,15 +573,25 @@ export default function MapaWebScreen() {
               onPress={() => setPainelEsquerdo((p) => (p === "busca" ? null : "busca"))}
               accessibilityLabel="Buscar"
             />
-            <ToggleItem
-              icone="cog-outline"
-              ativo={painelEsquerdo === "config"}
-              corFundo={colors.textPrimary}
-              corIcone={painelEsquerdo === "config" ? colors.background : colors.textSecondary}
-              estiloItem={styles.toggleItemIcone}
+            <Pressable
+              style={[
+                styles.toggleItemIcone,
+                painelEsquerdo === "config" && { backgroundColor: colors.textPrimary },
+              ]}
               onPress={() => setPainelEsquerdo((p) => (p === "config" ? null : "config"))}
               accessibilityLabel="Configurações"
-            />
+              accessibilityRole="button"
+            >
+              {avatarGoogle ? (
+                <Image source={{ uri: avatarGoogle }} style={styles.avatarConta} />
+              ) : (
+                <MaterialCommunityIcons
+                  name="cog-outline"
+                  size={16}
+                  color={painelEsquerdo === "config" ? colors.background : colors.textSecondary}
+                />
+              )}
+            </Pressable>
           </View>
 
           {carregando && (
@@ -955,6 +968,8 @@ function PainelBuscaFiltros({
 function PainelConfig({ colors, aoFechar }: { colors: ThemeColors; aoFechar: () => void }) {
   const router = useRouter();
   const { session, usuario, sair } = useAuth();
+  const avatarGoogle = session?.user.user_metadata?.avatar_url as string | undefined;
+  const nomeGoogle = session?.user.user_metadata?.full_name as string | undefined;
   const styles = useMemo(() => criarEstilosPainelBusca(colors), [colors]);
   const stylesConfig = useMemo(() => criarEstilosPainelConfig(colors), [colors]);
 
@@ -976,10 +991,17 @@ function PainelConfig({ colors, aoFechar }: { colors: ThemeColors; aoFechar: () 
         <View style={stylesConfig.contaCard}>
           {session ? (
             <>
-              <Text style={stylesConfig.texto}>
-                Logado como {usuario?.nome ? `${usuario.nome} — ` : ""}
-                {session.user.email}
-              </Text>
+              <View style={stylesConfig.perfilLinha}>
+                {avatarGoogle && (
+                  <Image source={{ uri: avatarGoogle }} style={stylesConfig.avatarPerfil} />
+                )}
+                <View style={stylesConfig.perfilTextos}>
+                  <Text style={stylesConfig.perfilNome}>
+                    {nomeGoogle ?? usuario?.nome ?? "Sua conta"}
+                  </Text>
+                  <Text style={stylesConfig.texto}>{session.user.email}</Text>
+                </View>
+              </View>
               <Pressable style={stylesConfig.botaoPrimario} onPress={() => router.push("/favoritos")}>
                 <Text style={stylesConfig.botaoPrimarioTexto}>Ver favoritos</Text>
               </Pressable>
@@ -1014,6 +1036,10 @@ function criarEstilosPainelConfig(colors: ThemeColors) {
     conteudo: { padding: 20, paddingTop: 4, gap: 18 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 17, flex: 1 },
     texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
+    perfilLinha: { flexDirection: "row", alignItems: "center", gap: 12 },
+    avatarPerfil: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: colors.eletrico },
+    perfilTextos: { flex: 1, gap: 2 },
+    perfilNome: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 16, lineHeight: 20 },
     contaCard: {
       backgroundColor: colors.surfaceGlass,
       borderWidth: 1,
@@ -1321,6 +1347,13 @@ function criarEstilos(colors: ThemeColors) {
       borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
+    },
+    avatarConta: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 2,
+      borderColor: colors.eletrico,
     },
     toggleDivisor: {
       width: 1,
