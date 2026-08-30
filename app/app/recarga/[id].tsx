@@ -142,10 +142,7 @@ export default function FichaRecarga() {
           showsUserLocation={mostrarMinhaLocalizacao}
           showsMyLocationButton={false}
         >
-          <Marker
-            coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}
-            tracksViewChanges={false}
-          >
+          <Marker coordinate={{ latitude: ponto.latitude, longitude: ponto.longitude }}>
             <PinMapa cor={colors.eletrico} patrocinado={patrocinado} tipo="recarga" />
           </Marker>
           {rota && (

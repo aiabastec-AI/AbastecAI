@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { ThemeColors } from "../src/theme";
@@ -8,13 +8,32 @@ import { tipografia } from "../src/typography";
 import { BotaoVoltar } from "../src/components/BotaoVoltar";
 import { GlassPanel } from "../src/components/GlassPanel";
 
+function sairDaTelaDeLogin(router: ReturnType<typeof useRouter>) {
+  if (router.canGoBack()) router.back();
+  else router.replace("/");
+}
+
 export default function Login() {
   const router = useRouter();
-  const { entrarComGoogle } = useAuth();
+  const { session, entrarComGoogle } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // O navegador de autenticação (Custom Tab) pode ficar minutos em primeiro plano
+  // enquanto a pessoa digita a senha/2FA no Google — tempo suficiente pro Android
+  // (principalmente Samsung, que é agressivo com isso) matar o processo do app em
+  // segundo plano. Quando o deep link de volta chega, o app reabre do zero e a
+  // Promise de `entrarComGoogle` (da instância antiga) nunca resolve, deixando esta
+  // tela "presa" mostrando "Continuar com Google" mesmo já logado (a sessão nova
+  // é restaurada normalmente via persistência, só a navegação que não acompanha).
+  // Esse efeito fecha a tela sozinha assim que percebe uma sessão ativa, cobrindo
+  // esse caso sem depender de `aoEntrarComGoogle` ter sobrevivido pra chamar back().
+  useEffect(() => {
+    if (session) sairDaTelaDeLogin(router);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   async function aoEntrarComGoogle() {
     setCarregando(true);
@@ -25,7 +44,7 @@ export default function Login() {
       setErro(resultado.erro);
       return;
     }
-    router.back();
+    sairDaTelaDeLogin(router);
   }
 
   return (

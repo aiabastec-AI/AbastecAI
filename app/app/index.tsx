@@ -9,6 +9,7 @@ import {
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +24,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ClusteredMapView from "react-native-map-clustering";
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from "react-native-maps";
 import { corDaNota, corDoModo, glowDoModo, type ModoMapa, type ThemeColors } from "../src/theme";
+import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
 import { tipografia } from "../src/typography";
 import { estiloMapaClaro, estiloMapaEscuro } from "../src/lib/googleMapStyle";
@@ -88,6 +90,8 @@ type ItemMapa = {
 
 export default function MapaScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  const avatarGoogle = session?.user.user_metadata?.avatar_url as string | undefined;
   const { colors, modo: modoTema } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
@@ -337,7 +341,11 @@ export default function MapaScreen() {
       <View style={styles.topbar}>
         <View style={styles.appbar}>
           <Pressable style={styles.appbarBotao} onPress={() => router.push("/config")}>
-            <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
+            {avatarGoogle ? (
+              <Image source={{ uri: avatarGoogle }} style={styles.avatarConta} />
+            ) : (
+              <MaterialCommunityIcons name="menu" size={28} color={colors.eletrico} />
+            )}
           </Pressable>
           <Text style={styles.logo}>AbastecAI</Text>
           <Pressable style={styles.appbarBotao} onPress={() => router.push("/filtros")}>
@@ -571,6 +579,13 @@ function criarEstilos(colors: ThemeColors, insetInferior: number) {
       borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
+    },
+    avatarConta: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: colors.eletrico,
     },
     logo: {
       fontFamily: "SpaceGrotesk_700Bold",

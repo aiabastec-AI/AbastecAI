@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../src/lib/auth";
 import { useTheme } from "../src/lib/ThemeProvider";
@@ -10,6 +10,8 @@ import type { ThemeColors } from "../src/theme";
 export default function Configuracoes() {
   const router = useRouter();
   const { session, usuario, sair, excluirConta } = useAuth();
+  const avatarGoogle = session?.user.user_metadata?.avatar_url as string | undefined;
+  const nomeGoogle = session?.user.user_metadata?.full_name as string | undefined;
   const { colors } = useTheme();
   const styles = useMemo(() => criarEstilos(colors), [colors]);
   const [excluindo, setExcluindo] = useState(false);
@@ -44,10 +46,13 @@ export default function Configuracoes() {
       <View style={styles.contaCard}>
         {session ? (
           <>
-            <Text style={styles.texto}>
-              Logado como {usuario?.nome ? `${usuario.nome} — ` : ""}
-              {session.user.email}
-            </Text>
+            <View style={styles.perfilLinha}>
+              {avatarGoogle && <Image source={{ uri: avatarGoogle }} style={styles.avatarPerfil} />}
+              <View style={styles.perfilTextos}>
+                <Text style={styles.perfilNome}>{nomeGoogle ?? usuario?.nome ?? "Sua conta"}</Text>
+                <Text style={styles.texto}>{session.user.email}</Text>
+              </View>
+            </View>
             <Pressable style={styles.botaoPrimario} onPress={() => router.push("/favoritos")}>
               <Text style={styles.botaoPrimarioTexto}>Ver favoritos</Text>
             </Pressable>
@@ -94,6 +99,10 @@ function criarEstilos(colors: ThemeColors) {
     cabecalho: { flexDirection: "row", alignItems: "center", gap: 12 },
     titulo: { ...tipografia.headlineMd, color: colors.textPrimary },
     texto: { ...tipografia.bodySm, color: colors.textSecondary, lineHeight: 20 },
+    perfilLinha: { flexDirection: "row", alignItems: "center", gap: 12 },
+    avatarPerfil: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: colors.eletrico },
+    perfilTextos: { flex: 1, gap: 2 },
+    perfilNome: { ...tipografia.headlineMd, color: colors.textPrimary, fontSize: 16, lineHeight: 20 },
     contaCard: {
       backgroundColor: colors.surfaceGlass,
       borderWidth: 1,

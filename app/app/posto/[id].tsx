@@ -150,10 +150,7 @@ export default function FichaPosto() {
           showsUserLocation={mostrarMinhaLocalizacao}
           showsMyLocationButton={false}
         >
-          <Marker
-            coordinate={{ latitude: posto.latitude, longitude: posto.longitude }}
-            tracksViewChanges={false}
-          >
+          <Marker coordinate={{ latitude: posto.latitude, longitude: posto.longitude }}>
             <PinMapa cor={corNota} patrocinado={patrocinado} tipo="posto" nota={posto.nota_anp} />
           </Marker>
           {rota && (
