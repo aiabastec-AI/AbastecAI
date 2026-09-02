@@ -751,3 +751,23 @@ Pra próximas sessões: iterar em mudanças de JS/TSX **não precisa gerar `.aab
 4. Só gerar o build de produção final (`eas build --profile production`) depois de tudo validado nesse ciclo rápido.
 
 Pegadinha nova descoberta: nesta máquina, processos `node` do Metro/`expo run:android` às vezes ficam **impossíveis de encerrar** via `taskkill`/`Stop-Process` mesmo aparecendo normalmente em `Get-Process` (rodam numa sessão do Windows diferente, aparentemente isolada — não investigado a fundo por quê). Contorno que funcionou: não tentar matar, só usar outra porta livre pro Metro novo (`netstat -ano` pra confirmar antes).
+
+## 22. Verificação visual real via screenshot por `adb` — método principal de teste (2026-09-02)
+
+Validado nesta sessão e adotado como **forma padrão de eu (Claude) confirmar mudanças visuais/UX no device físico**, em vez de descrever o que deveria acontecer ou depender só do usuário relatar o que viu. Sem gerar `.apk`/`.aab` novo — usa o mesmo fluxo rápido da seção 21.4 (Metro + dev client já instalado), mais interação e visão direta via `adb`.
+
+### 22.1 Passo a passo
+
+1. **Confirmar o device**: `adb devices -l`. Localizar o `adb.exe` desta máquina em `C:\Users\gabon\dev-tools\android-sdk\platform-tools\adb.exe` (não está no PATH do Git Bash).
+2. **Checar o que já está instalado antes de qualquer coisa** (lição da seção 21.2): `adb shell pm list packages | grep abastec`. Nesta máquina o dev client (`com.abastecai.app.dev`) já convive instalado ao lado da produção (`com.abastecai.app`) — não precisa reinstalar nada na maioria das vezes.
+3. **Subir o Metro** (`npx expo start --port 8081 -c`) e conectar: `adb reverse tcp:8081 tcp:8081`.
+4. **Abrir o dev client mirando o pacote explicitamente**: `adb shell am start -a android.intent.action.VIEW -d "abastecai://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" -p com.abastecai.app.dev`. **A flag `-p` é obrigatória** — o app de produção registra o mesmo esquema `abastecai://`, então sem `-p` o Android abre um seletor de app (`ResolverActivity`) que ninguém consegue tocar via `adb`, e o launch fica sem efeito nenhum (nem erro, nem log — só não abre nada).
+5. **Ver a tela de verdade**: `adb exec-out screencap -p > arquivo.png`, depois ler o PNG com a ferramenta de leitura de arquivo — dá pra enxergar o estado real do app, não só inferir pelo código.
+6. **Interagir**: `adb shell input tap <x> <y>` usa a resolução **física** do device (`adb shell wm size`), não o tamanho eventualmente reduzido que aparece na pré-visualização da imagem lida — sempre converter pela escala informada.
+7. **Double-tap de verdade** (ex.: zoom in no mapa) precisa dos dois taps **em sequência sem `sleep` entre eles** (`input tap X Y; input tap X Y` no mesmo comando) — com delay, o Android trata como dois taps separados, podendo abrir o item embaixo do dedo (aconteceu: abriu a ficha de um posto em vez de dar zoom).
+
+### 22.2 Pegadinhas que geraram falso-negativo e falso-positivo nesta sessão
+
+- **`adb reverse` cai sozinho no meio da sessão**, sem aviso — o app mostra "Cannot connect to Expo CLI" (visível em `adb logcat -d | grep ReactNativeJS`), não um erro do app. Se uma interação parecer "não ter feito nada", checar `adb reverse --list` antes de suspeitar de bug de JS.
+- **GPS de alta precisão (`Accuracy.High`) leva tempo real pra fixar** — nesta sessão, de ~3 a 8s pra sair de uma leitura ruim (15-20m) pra uma boa (~1m), confirmado direto no log nativo (`SLocation`/`GnssLocationProvider`). Tirar screenshot 2s depois de uma ação de localização e concluir "não funcionou" é **falso-negativo** — sempre esperar uns 8-9s antes de julgar.
+- **Fast Refresh pode dar falso-positivo por sorte de zoom, não por o fix funcionar de verdade**: ao tentar desativar o tilt 3D do Google Maps, a primeira tentativa (`pitchEnabled={false}`) pareceu ter resolvido num teste, mas era só porque aquele double-tap específico não tinha chegado no mesmo nível de zoom da vez anterior — o tilt 3D automático (diferente do gesto manual de inclinar, que é o que `pitchEnabled` de fato controla) continuava ativo. Só ficou confirmado de verdade repetindo o teste na mesma área/profundidade de zoom onde o bug tinha aparecido antes, e a prop certa era `showsBuildings={false}`. **Regra prática: repetir o teste no mesmo ponto exato (mesma área, mesmo nível de zoom) onde o bug foi visto antes de declarar corrigido — não só "parece ter melhorado".**
