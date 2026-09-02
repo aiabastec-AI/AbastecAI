@@ -318,6 +318,14 @@ export default function MapaScreen() {
   return (
     <View style={styles.container}>
       <MapView
+        // O MapView puro do react-native-maps (Android) não remove direito um <Marker>
+        // do mapa nativo quando ele some do array (ao trocar de filtro, por ex.) — mesma
+        // classe de bug documentada na sessão 21 pra lib de clustering antiga, só que
+        // agora na lib de mapa em si. Forçar remontagem completa ao trocar `modo` é o
+        // mesmo contorno que já funcionava antes. `initialRegion` usa a última posição
+        // conhecida da câmera (regiaoVisivel, sempre atualizada via onRegionChangeComplete)
+        // pra não pular de volta pro centro padrão nesse remount.
+        key={modo}
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
