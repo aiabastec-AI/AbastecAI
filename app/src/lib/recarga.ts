@@ -22,8 +22,17 @@ export interface PontoRecargaDetalhe {
   potencia_kw: number | null;
   status: string | null;
   operador: string | null;
+  fonte: string | null;
   latitude: number;
   longitude: number;
+}
+
+// Texto de crédito da fonte do dado, mostrado na ficha (ao lado do status).
+// `fonte` nulo/desconhecido cai em Open Charge Map porque é a fonte de todos os pontos
+// sincronizados antes de existir qualquer fonte manual (ver seção 24 do ARQUITETURA.md).
+export function fonteExibicao(fonte: string | null): string {
+  if (fonte?.startsWith("gwm_oficial")) return "Localizador oficial GWM";
+  return "Open Charge Map";
 }
 
 export async function buscarPontosRecargaProximos(
@@ -77,7 +86,7 @@ export async function buscarPontoRecargaPorId(id: string): Promise<PontoRecargaD
   const { data, error } = await supabase
     .from("pontos_recarga")
     .select(
-      "id, nome, endereco, cidade, uf, tipo_conector, potencia_kw, status, latitude, longitude, redes_recarga(nome)"
+      "id, nome, endereco, cidade, uf, tipo_conector, potencia_kw, status, fonte, latitude, longitude, redes_recarga(nome)"
     )
     .eq("id", id)
     .maybeSingle();

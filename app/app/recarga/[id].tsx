@@ -8,7 +8,7 @@ import type { ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
 import { tipografia } from "../../src/typography";
 import { estiloMapaClaro, estiloMapaEscuro } from "../../src/lib/googleMapStyle";
-import { buscarPontoRecargaPorId, type PontoRecargaDetalhe } from "../../src/lib/recarga";
+import { buscarPontoRecargaPorId, fonteExibicao, type PontoRecargaDetalhe } from "../../src/lib/recarga";
 import { buscarRota, type RotaCalculada } from "../../src/lib/rotas";
 import { BotaoFavorito } from "../../src/components/BotaoFavorito";
 import { BotaoVoltar } from "../../src/components/BotaoVoltar";
@@ -188,7 +188,7 @@ export default function FichaRecarga() {
               <View style={[styles.statusDot, { backgroundColor: corStatus, boxShadow: `0px 0px 8px ${corStatus}` }]} />
               <Text style={styles.statusTexto}>{status.texto}</Text>
             </View>
-            <Text style={styles.statusMeta}>Open Charge Map</Text>
+            <Text style={styles.statusMeta}>{fonteExibicao(ponto.fonte)}</Text>
           </View>
           {endereco && (
             <>
