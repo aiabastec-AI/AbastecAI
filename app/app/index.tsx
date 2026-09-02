@@ -78,6 +78,19 @@ const REGIAO_INICIAL: Region = {
   longitudeDelta: deltaDoZoom(12),
 };
 
+const ZOOM_LOCAL = 16;
+const PRECISAO_MAXIMA_M = 100;
+
+async function obterLocalizacaoAtualConfiavel() {
+  const posicao = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
+  });
+  if (posicao.coords.accuracy != null && posicao.coords.accuracy > PRECISAO_MAXIMA_M) {
+    throw new Error("Localização imprecisa demais.");
+  }
+  return posicao;
+}
+
 type ItemMapa = {
   id: string;
   tipo: "posto" | "recarga";
@@ -182,8 +195,8 @@ export default function MapaScreen() {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === Location.PermissionStatus.GRANTED) {
         try {
-          const posicao = await Location.getCurrentPositionAsync({});
-          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+          const posicao = await obterLocalizacaoAtualConfiavel();
+          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
         } catch {
           // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
         }
@@ -197,8 +210,12 @@ export default function MapaScreen() {
   async function irParaMinhaLocalizacao() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;
-    const posicao = await Location.getCurrentPositionAsync({});
-    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+    try {
+      const posicao = await obterLocalizacaoAtualConfiavel();
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
+    } catch {
+      setErro("Não consegui obter uma localização precisa agora.");
+    }
   }
 
   async function aoPermitirLocalizacaoOnboarding() {
@@ -208,8 +225,12 @@ export default function MapaScreen() {
       return;
     }
     setMostrarOnboarding(false);
-    const posicao = await Location.getCurrentPositionAsync({});
-    irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+    try {
+      const posicao = await obterLocalizacaoAtualConfiavel();
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
+    } catch {
+      setErro("Não consegui obter uma localização precisa agora.");
+    }
   }
 
   async function aoBuscarCidadeOnboarding() {
@@ -317,6 +338,10 @@ export default function MapaScreen() {
         onRegionChangeComplete={aoRegiaoMudar}
         showsUserLocation
         showsMyLocationButton={false}
+        showsCompass={false}
+        // Sem tilt 3D de prédios: no zoom de rua isso sobrepõe/atrapalha achar os pins,
+        // que é a função central do app — não é algo que valha virar preferência do usuário.
+        pitchEnabled={false}
         radius={30}
         // maxZoom baixo de propósito: só agrupa em zoom bem afastado (visão de região/cidade
         // inteira); assim que a pessoa começa a dar zoom in, mostra cada pin separado.
