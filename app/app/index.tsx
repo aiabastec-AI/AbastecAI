@@ -70,6 +70,15 @@ function raioBuscaM(zoom: number, lat: number): number {
   return Math.round(Math.min(Math.max(raio, 3000), 150000));
 }
 
+// Pin sempre no mesmo tamanho/aparência, em qualquer zoom — sem exceção, de propósito.
+// Três tentativas diferentes de mudar tamanho/aparência do pin conforme o zoom (bolinha
+// agregada por grade, pin pequeno trocado só no fim do gesto, ambas com key por camada)
+// quebraram do mesmo jeito num device físico real (pin fantasma, e a última tentativa
+// ainda quebrou o filtro Combustível/Elétrico e o clique no pin) — ver ARQUITETURA.md
+// seção 25. Sinal forte de que não é jeito de implementar, é limitação real do
+// react-native-maps + Android nessa combinação. Não retomar sem mudar de abordagem de
+// verdade (ex.: parar de mostrar pin nenhum abaixo de um zoom, em vez de trocar aparência).
+
 const REGIAO_INICIAL: Region = {
   latitude: CENTRO_INICIAL_LAT,
   longitude: CENTRO_INICIAL_LNG,
