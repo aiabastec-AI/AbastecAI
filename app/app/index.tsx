@@ -341,7 +341,10 @@ export default function MapaScreen() {
         showsCompass={false}
         // Sem tilt 3D de prédios: no zoom de rua isso sobrepõe/atrapalha achar os pins,
         // que é a função central do app — não é algo que valha virar preferência do usuário.
+        // pitchEnabled só bloqueia o gesto manual de inclinar; showsBuildings é o que
+        // realmente desativa o tilt automático que o Google Maps ativa sozinho em zoom alto.
         pitchEnabled={false}
+        showsBuildings={false}
         radius={30}
         // maxZoom baixo de propósito: só agrupa em zoom bem afastado (visão de região/cidade
         // inteira); assim que a pessoa começa a dar zoom in, mostra cada pin separado.
