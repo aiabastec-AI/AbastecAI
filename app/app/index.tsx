@@ -77,7 +77,7 @@ const REGIAO_INICIAL: Region = {
   longitudeDelta: deltaDoZoom(12),
 };
 
-const ZOOM_LOCAL = 8; // TEMP teste visual clustering — reverter pra 16
+const ZOOM_LOCAL = 16;
 const PRECISAO_MAXIMA_M = 100;
 
 async function obterLocalizacaoAtualConfiavel() {
