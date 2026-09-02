@@ -21,7 +21,6 @@ import {
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import ClusteredMapView from "react-native-map-clustering";
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from "react-native-maps";
 import { corDaNota, corDoModo, glowDoModo, type ModoMapa, type ThemeColors } from "../src/theme";
 import { useAuth } from "../src/lib/auth";
@@ -78,7 +77,7 @@ const REGIAO_INICIAL: Region = {
   longitudeDelta: deltaDoZoom(12),
 };
 
-const ZOOM_LOCAL = 16;
+const ZOOM_LOCAL = 8; // TEMP teste visual clustering — reverter pra 16
 const PRECISAO_MAXIMA_M = 100;
 
 async function obterLocalizacaoAtualConfiavel() {
@@ -108,8 +107,6 @@ export default function MapaScreen() {
   const { colors, modo: modoTema } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
-  // react-native-map-clustering envolve o MapView nativo — o ref direto (animateToRegion
-  // etc.) sai pela prop `mapRef`, não pelo `ref` do componente wrapper.
   const mapRef = useRef<MapView | null>(null);
   const [modo, setModo] = useState<ModoMapa>("ambos");
   const [postos, setPostos] = useState<PostoProximo[]>([]);
@@ -263,11 +260,6 @@ export default function MapaScreen() {
   const mostrarCombustivel = modo === "combustivel" || modo === "ambos";
   const mostrarEletrico = modo === "eletrico" || modo === "ambos";
 
-  // Diferente do Mapbox (que tinha 2 fontes de cluster independentes por camada), o
-  // react-native-map-clustering agrupa todos os <Marker> filhos do mesmo MapView num só
-  // motor de cluster — postos e recarga clusterizam juntos quando "ambos" está ativo.
-  // Simplificação aceita de propósito (ver plano da migração): cada marcador individual
-  // continua com a cor certa, só o balão de cluster fica neutro em vez de por tipo.
   const itensMapa = useMemo(() => {
     const itens: ItemMapa[] = [];
     if (mostrarCombustivel) {
@@ -316,22 +308,9 @@ export default function MapaScreen() {
 
   return (
     <View style={styles.container}>
-      <ClusteredMapView
-        // A lib (react-native-map-clustering) reassocia markers ao array de dados por
-        // ÍNDICE, não pela nossa key — quando a quantidade de pins muda bastante (ex.:
-        // trocar de "Combustível" pra "Elétrico") ela não limpa direito os markers antigos,
-        // ficando pins acumulados de tipos diferentes. Forçar remontagem completa via `key`
-        // toda vez que o filtro muda é o jeito confiável de resetar o estado interno dela;
-        // `initialRegion` usa a última posição conhecida da câmera (não a inicial fixa) pra
-        // não "pular" de volta pro centro padrão nesse remount.
-        key={modo}
+      <MapView
+        ref={mapRef}
         style={styles.map}
-        // O .d.ts do react-native-map-clustering declara `mapRef` como recebendo um
-        // React.Ref<MapView> (bug de tipagem da lib — a instância real é o que vem em
-        // runtime) — `any` aqui contorna isso sem mascarar erros de tipo no resto do arquivo.
-        mapRef={(ref: any) => {
-          mapRef.current = ref;
-        }}
         provider={PROVIDER_GOOGLE}
         customMapStyle={modoTema === "claro" ? estiloMapaClaro : estiloMapaEscuro}
         initialRegion={regiaoVisivel}
@@ -345,13 +324,6 @@ export default function MapaScreen() {
         // realmente desativa o tilt automático que o Google Maps ativa sozinho em zoom alto.
         pitchEnabled={false}
         showsBuildings={false}
-        radius={30}
-        // maxZoom baixo de propósito: só agrupa em zoom bem afastado (visão de região/cidade
-        // inteira); assim que a pessoa começa a dar zoom in, mostra cada pin separado.
-        maxZoom={10}
-        clusterColor={colors.textPrimary}
-        clusterTextColor={colors.background}
-        clusterFontFamily="Inter_600SemiBold"
       >
         {itensMapa.map((item) => (
           <Marker
@@ -364,7 +336,7 @@ export default function MapaScreen() {
             <PinMapa cor={item.cor} patrocinado={item.patrocinado} tipo={item.tipo} nota={item.nota} />
           </Marker>
         ))}
-      </ClusteredMapView>
+      </MapView>
 
       <View style={styles.topbar}>
         <View style={styles.appbar}>
