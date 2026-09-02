@@ -31,6 +31,7 @@ import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
 import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
+import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel } from "../src/lib/localizacao";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { PinMapa } from "../src/components/PinMapa";
@@ -86,18 +87,6 @@ const REGIAO_INICIAL: Region = {
   longitudeDelta: deltaDoZoom(12),
 };
 
-const ZOOM_LOCAL = 16;
-const PRECISAO_MAXIMA_M = 100;
-
-async function obterLocalizacaoAtualConfiavel() {
-  const posicao = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  });
-  if (posicao.coords.accuracy != null && posicao.coords.accuracy > PRECISAO_MAXIMA_M) {
-    throw new Error("Localização imprecisa demais.");
-  }
-  return posicao;
-}
 
 type ItemMapa = {
   id: string;

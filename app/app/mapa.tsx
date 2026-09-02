@@ -44,6 +44,7 @@ import {
 } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
+import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel } from "../src/lib/localizacao";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { FichaPosto } from "../src/components/FichaPosto";
@@ -175,7 +176,7 @@ export default function MapaWebScreen() {
           setErro("Preciso da sua localização pra traçar a rota.");
           return;
         }
-        const posicao = await Location.getCurrentPositionAsync({});
+        const posicao = await obterLocalizacaoAtualConfiavel();
         definirMinhaLocalizacao({
           lat: posicao.coords.latitude,
           lng: posicao.coords.longitude,
@@ -329,9 +330,9 @@ export default function MapaWebScreen() {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === Location.PermissionStatus.GRANTED) {
         try {
-          const posicao = await Location.getCurrentPositionAsync({});
+          const posicao = await obterLocalizacaoAtualConfiavel();
           definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
-          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+          irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
         } catch {
           // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
         }
@@ -349,11 +350,11 @@ export default function MapaWebScreen() {
         setErro("Permissão de localização negada pelo navegador.");
         return;
       }
-      const posicao = await Location.getCurrentPositionAsync({});
+      const posicao = await obterLocalizacaoAtualConfiavel();
       definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
-      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 14);
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch (e) {
-      const mensagem = (e as { message?: string })?.message || "Não foi possível obter sua localização.";
+      const mensagem = (e as { message?: string })?.message || "Não consegui obter uma localização precisa agora.";
       setErro(mensagem);
     }
   }
@@ -366,9 +367,9 @@ export default function MapaWebScreen() {
         return;
       }
       setMostrarOnboarding(false);
-      const posicao = await Location.getCurrentPositionAsync({});
+      const posicao = await obterLocalizacaoAtualConfiavel();
       definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
-      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, 13);
+      irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch {
       // Falha ao obter posição (GPS indisponível, timeout etc.) — mesma mensagem da negação
       // explícita, já que daqui o usuário só tem mesmo a saída de digitar a cidade.
