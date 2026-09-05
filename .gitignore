@@ -12,6 +12,10 @@ node_modules
 # Dados brutos baixados manualmente pra backfill (grandes demais/não fazem sentido versionar)
 scripts/dados/
 
+# Log e checkpoint de progresso do backfill de coordenadas (estado local de execução, não código)
+scripts/backfill-coordenadas.log
+scripts/backfill-coordenadas-progresso.json
+
 # Builds baixados da EAS (binários grandes, não fazem sentido versionar)
 *.aab
 *.apk

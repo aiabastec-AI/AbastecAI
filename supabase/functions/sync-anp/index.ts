@@ -12,6 +12,20 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const ANP_BASE_URL = "https://revendedoresapi.anp.gov.br/v1/combustivel";
 const PAGE_SIZE_ANP = 5000; // fixo pela API, não é parâmetro
 
+// A ANP às vezes devolve o registro sem latitude/longitude (~15,6% dos casos, ver
+// ARQUITETURA.md seção 27) — em vez de descartar um posto legalmente registrado só por
+// isso, tenta geocodificar o endereço pelo Nominatim (grátis, sem chave). Limite por
+// execução existe pra não estourar o tempo da Edge Function num dia com muitos casos
+// novos — o grosso do backlog (7 mil+) é resolvido à parte pelo
+// scripts/backfill-coordenadas-anp.js; isso aqui só cobre o gotejamento diário.
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_USER_AGENT = "AbastecAI-sync-anp/1.0 (contato: chicolicia@gmail.com)";
+const NOMINATIM_INTERVALO_MS = 1100;
+const MAX_GEOCODIFICACOES_POR_EXECUCAO = 20;
+const TIPOS_MUITO_GENERICOS = new Set([
+  "administrative", "city", "town", "village", "state", "country", "county", "postcode",
+]);
+
 interface RegistroAnp {
   cnpj: string;
   razaoSocial: string;
@@ -20,6 +34,7 @@ interface RegistroAnp {
   bairro: string;
   municipio: string;
   uf: string;
+  cep: string;
   distribuidora: string;
   dataPublicacao: string; // DD/MM/AAAA
   latitude: string;
@@ -48,8 +63,44 @@ function coordenadaValida(lat: string, lng: string): { lat: number; lng: number 
   return { lat: latNum, lng: lngNum };
 }
 
-function montarLinhaPosto(registro: RegistroAnp) {
-  const coord = coordenadaValida(registro.latitude, registro.longitude);
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function apenasDigitos(texto: string | undefined): string {
+  return (texto ?? "").replace(/\D/g, "");
+}
+
+// NÃO inclui `bairro` na busca — o nome de bairro da ANP às vezes não bate com o nome que
+// o OSM usa pro mesmo trecho de rua, e isso zera o resultado do Nominatim (achado testando
+// contra o caso real do Totalle Auto Posto, Araraquara/SP — ver ARQUITETURA.md seção 27).
+// Avenidas longas retornam vários trechos com CEPs diferentes — desempata pelo CEP que a
+// própria ANP informou.
+async function geocodificarEndereco(
+  endereco: string,
+  municipio: string,
+  uf: string,
+  cep: string
+): Promise<{ lat: number; lng: number } | null> {
+  const consulta = [endereco, municipio, uf, "Brasil"].filter(Boolean).join(", ");
+  const url = `${NOMINATIM_URL}?format=json&limit=5&countrycodes=br&addressdetails=1&q=${encodeURIComponent(consulta)}`;
+  const resposta = await fetch(url, { headers: { "User-Agent": NOMINATIM_USER_AGENT } });
+  if (!resposta.ok) return null;
+  const dados = await resposta.json();
+  if (!dados.length) return null;
+
+  const cepAlvo = apenasDigitos(cep);
+  const porCep = cepAlvo
+    ? dados.find((r: { address?: { postcode?: string } }) => apenasDigitos(r.address?.postcode) === cepAlvo)
+    : null;
+  const r = porCep ?? dados[0];
+
+  if (TIPOS_MUITO_GENERICOS.has(r.type) || TIPOS_MUITO_GENERICOS.has(r.class)) return null;
+  return { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+}
+
+function montarLinhaPosto(registro: RegistroAnp, coordFallback?: { lat: number; lng: number }) {
+  const coord = coordenadaValida(registro.latitude, registro.longitude) ?? coordFallback ?? null;
   if (!coord) return null;
 
   const enderecoCompleto = [registro.endereco, registro.complemento, registro.bairro]
@@ -114,6 +165,7 @@ Deno.serve(async (req) => {
   let lidos = 0;
   let gravados = 0;
   let pulados = 0;
+  let geocodificacoesFeitas = 0;
 
   try {
     const primeiraPagina = await buscarPagina(uf, 1);
@@ -128,9 +180,22 @@ Deno.serve(async (req) => {
       const registros = resposta.data ?? [];
       lidos += registros.length;
 
-      const linhas = registros
-        .map(montarLinhaPosto)
-        .filter((linha): linha is NonNullable<typeof linha> => linha !== null);
+      const linhas: NonNullable<ReturnType<typeof montarLinhaPosto>>[] = [];
+      for (const registro of registros) {
+        let linha = montarLinhaPosto(registro);
+        if (!linha && registro.endereco && registro.municipio && geocodificacoesFeitas < MAX_GEOCODIFICACOES_POR_EXECUCAO) {
+          geocodificacoesFeitas++;
+          const coord = await geocodificarEndereco(
+            registro.endereco,
+            registro.municipio,
+            registro.uf,
+            registro.cep
+          );
+          await sleep(NOMINATIM_INTERVALO_MS);
+          if (coord) linha = montarLinhaPosto(registro, coord);
+        }
+        if (linha) linhas.push(linha);
+      }
       pulados += registros.length - linhas.length;
 
       // upsert em lotes de 500 pra não estourar o payload de uma vez só
