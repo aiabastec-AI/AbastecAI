@@ -863,3 +863,57 @@ Com tudo commitado (12 commits desde o início da sessão) e passado no `origin/
 Build ficou em **"in queue" por mais de 1h30 sem sair do lugar** (`updatedAt` do registro do build parado, confirmado via `eas build:list --json` — build normal desse projeto historicamente fica só ~30-100s na fila antes de começar a rodar). Confirmado via [status.expo.dev](https://status.expo.dev) (página pública, fora do projeto): **incidente ativo da própria Expo/EAS**, "Elevated Linux worker queue times", identificado nesse mesmo dia — causa raiz deles é sobrecarga nos caches de pacote dos workers Linux, afetando fila de build Android especificamente. Não é nada do lado do projeto/conta — builds em andamento continuam completando, só a fila está lenta.
 
 **Decisão do usuário**: parar de esperar hoje, retomar amanhã. **O build ficou na fila, não foi cancelado** — pode terminar sozinho de um dia pro outro se a Expo resolver o incidente antes; senão, checar `npx eas build:view 02828ca6-6c73-4ec6-a158-1c17ea70a385` (ou `eas build:list`) antes de disparar um novo, pra não empilhar builds redundantes.
+
+## 27. Enriquecimento com dados públicos do Google (nota, avaliações, telefone, site, horário) (2026-09-05)
+
+Pedido do usuário: mostrar na ficha do posto a nota e avaliações "do Google Meu Negócio". Esclarecido antes de implementar que **não existe API do Google Business Profile pra ficha de terceiros** — essa API só dá acesso a fichas que o próprio usuário administra (dono verificado via OAuth). O que dá pra puxar de qualquer posto é a **Places API (New)**, os mesmos dados públicos que aparecem pra qualquer um no Google Maps (nota, contagem de avaliações, até 5 comentários, telefone, site, horário) — paga por chamada, sem plano gratuito ilimitado.
+
+### 27.1 Decisão de custo: sob demanda + cache de 90 dias, nunca em lote
+
+Cotado com o usuário antes de implementar (preços oficiais em `developers.google.com/maps/billing-and-pricing/pricing`, SKU "Place Details Enterprise + Atmosphere" — o único que inclui `reviews`): US$25/1.000 chamadas de Place Details além da cota grátis (1.000/mês), e US$32/1.000 de Text Search (achar o `place_id`) além de 5.000/mês grátis. Rodar em lote pra todos os ~38.700 postos custaria a mais de US$1.000 só no matching inicial.
+
+Escolhido em vez disso: buscar **só quando alguém abre a ficha daquele posto** (nunca em background/cron), com cache de **90 dias** em `postos.google_atualizado_em` — TTL escolhido pelo usuário depois de ver a comparação de custo entre 7/30/90 dias (90 dias tende a ficar inteiramente dentro da cota grátis num cenário de tráfego inicial; 7 dias podia custar ~4x mais que 30 dias pra postos revisitados toda semana). O matching nome→`place_id` só acontece uma vez por posto pra sempre (fica salvo), então também tende a ficar de graça se o ritmo de "postos vistos pela 1ª vez" não passar de 5.000/mês.
+
+### 27.2 Proteção de custo contra abuso — teto diário de chamadas
+
+Como a function é chamada com a chave `publishable` (pública por natureza, embutida no app), qualquer um poderia, em tese, forçar refresh em massa direto pela Edge Function e gerar uma conta alta de uma vez. Mitigado com um teto diário fixo no código (`MAX_TEXT_SEARCH_POR_DIA`/`MAX_PLACE_DETAILS_POR_DIA` = 200 cada, em `supabase/functions/enriquecer-google-posto/index.ts`) — acima disso a function volta a servir só o que já tem em cache (mesmo desatualizado) em vez de chamar o Google. Cada chamada real ao Google é logada em `google_enriquecimento_logs` (tabela nova, sem policy de RLS — só a service role acessa) só pra contar esse teto; não guarda nada além de tipo/posto/data.
+
+### 27.3 Implementação
+
+- Migration `20260905180000_google_places_enriquecimento.sql`: colunas `google_*` em `postos` (`place_id`, `sem_correspondencia`, `nota`, `total_avaliacoes`, `avaliacoes` jsonb, `telefone`, `website`, `horario` jsonb, `atualizado_em`) + tabela `google_enriquecimento_logs`.
+- Edge Function `enriquecer-google-posto`: recebe `posto_id`, checa cache, faz Text Search (Places API New) só se ainda não tem `google_place_id`, senão vai direto pro Place Details. Trata `place_id` morto (404, posto fechou/foi mesclado no Google) limpando o registro em vez de tentar de novo pra sempre. **Precisou de CORS explícito** (`Access-Control-Allow-Origin`) — diferente de `sync-anp`/`sync-ocm` (só chamadas servidor-a-servidor do cron), essa function é chamada direto do navegador na versão web do app, e sem os headers de CORS o preflight falhava silenciosamente (achado só ao testar de verdade num browser real, não apareceria num teste via `curl`/native).
+- Chave do Google: reaproveitada a `GOOGLE_BACKEND_API_KEY` já existente (só usada em scripts server-side, nunca no bundle do app) — restrição de API ampliada de só `geocoding-backend.googleapis.com` pra incluir também `places.googleapis.com`. API `places.googleapis.com` habilitada no projeto GCP `abastecai` (billing já estava ativo).
+- App: `src/lib/googlePosto.ts` (`buscarDadosGoogle`, nunca lança erro pra fora, mesmo padrão de `patrocinios.ts`) chamado a partir do `useEffect` de carregamento da ficha. **Precisou editar os dois arquivos da ficha de posto** — `app/posto/[id].tsx` (nativo) **e** `app/posto/[id].web.tsx` (fallback web, usado pelo Expo Router no navegador porque a versão nativa usa `react-native-maps`, que não roda lá) — só editar um deles faz a feature funcionar numa plataforma e não aparecer silenciosamente na outra.
+
+### 27.4 Teste real
+
+Validado via `curl` direto na Edge Function (matching + nota 4.4 + 5 reviews reais + telefone + horário, cache confirmado numa segunda chamada) e via screenshot real (`playwright-core` + Chrome instalado na máquina, apontando pro `expo start --web`) mostrando a seção "Google" renderizada na ficha com nota, avaliações e telefone. **Não testado no emulador/device Android nativo** nesta sessão (só web) — o código do lado nativo (`[id].tsx`) é idêntico em estrutura ao já validado do lado web, mas a confirmação visual real ficou só na versão web.
+
+### 27.5 Investigação real: posto "sumido" em Araraquara/SP levou à descoberta dos 7 mil pulados
+
+Usuário reportou que um posto de verdade — **Totalle Auto Posto Ltda** (bandeira VIBRA/Petrobras, "BR Mania"), Av. Padre Francisco Sales Colturato 327, Centro, Araraquara/SP, localizado por um Plus Code do Google Maps (`6R99+W3`) — não aparecia no app. Investigação, **sem custo nenhum** (decodificação de Plus Code offline via lib `open-location-code` + referência de cidade pelo Nominatim, mais uma única consulta pontual à Places API pra identificar o nome real do estabelecimento — ~$0,03, dentro da cota grátis):
+
+1. Decodificado o Plus Code pra coordenada exata.
+2. Cruzamento geográfico (`ST_DWithin` num raio de 1km) não achou **nada** registrado ali — nem sob outro nome/bandeira.
+3. Puxado o registro bruto da própria API da ANP pro CNPJ da região: o posto **está** cadastrado na ANP (`TOTALLE AUTO POSTO LTDA`, CNPJ `25384281000154`, endereço batendo 100%, distribuidora `VIBRA`) — só que com `latitude`/`longitude` **vazios na própria fonte**. O `sync-anp` descarta esses registros (coluna `NOT NULL`), então nunca chegam a ser gravados.
+4. Somando `sync_logs` de todos os 27 estados: **7.131 postos nacionais (~15,6% do total lido da ANP)** estavam nessa mesma situação — legalmente registrados, endereço completo, só sem coordenada.
+
+### 27.6 Backfill de coordenadas via geocodificação gratuita (Nominatim/OSM)
+
+Decisão do usuário: tentar resolver via geocodificação **gratuita** (Nominatim/OpenStreetMap) antes de considerar qualquer opção paga, e perguntou explicitamente por que o `endereco` desses 7 mil registros não era usado — resposta: era exatamente isso que faltava implementar (o `sync-anp` original só confiava na coordenada pronta da ANP, nunca geocodificou nada).
+
+**Duas descobertas que exigiram correção de rota, achadas testando contra o próprio caso do Totalle antes de rodar em escala:**
+- Incluir o **`bairro`** da ANP na consulta ao Nominatim **zerava o resultado** — o nome de bairro que a ANP usa ("CENTRO") às vezes não bate com o nome que o OpenStreetMap usa pro mesmo trecho de rua ("Vila Ferroviária"), e isso quebra o matching. Solução: consulta só com `endereco + município + uf + Brasil`, sem bairro.
+- Avenidas longas retornam **vários trechos** com CEPs diferentes (o Nominatim não sabe qual "pedaço" da rua é o certo pro número da casa). Solução: pedir `addressdetails=1&limit=5` e desempatar pelo **CEP que a própria ANP informou** — quando bate, usa esse; senão, primeiro resultado mesmo.
+
+Isso elevou a taxa de acerto de **~11% pra ~55-60%** nos estados testados (o "sem sucesso" residual é majoritariamente endereço genuinamente sem correspondência postal — ex.: AC/AM têm muitos registros tipo "margem esquerda do rio Juruá, S/N", locais ribeirinhos sem endereço real, que nenhum serviço de geocodificação resolve).
+
+Script: `scripts/backfill-coordenadas-anp.js` — relê a API da ANP por UF (mesma fonte do `sync-anp`), filtra só quem não tem coordenada, geocodifica pelo Nominatim (grátis, sem chave, 1 req/s) e faz upsert em `postos` por CNPJ. Roda ~2h pros 7 mil endereços; salva progresso em disco (`backfill-coordenadas-progresso.json`, `cnpjsProcessados` + `ufsCompletas`) pra poder retomar sem repetir trabalho.
+
+**Dois problemas reais de execução, ambos corrigidos em produção:**
+1. **A máquina ficou sem memória duas vezes** durante a rodada (processos do usuário — Brave, ClickUp, Warp — competindo por RAM num total de 12GB) e o processo em background foi morto pelo sistema. Não é bug do script; resolvido só retomando do checkpoint.
+2. **A própria API da ANP devolveu 429 (rate limit)** quando o script, ao retomar, refazia a varredura completa de estados já 100% concluídos só pra filtrar CNPJs já processados — rajada de chamadas sem espaçamento suficiente. Corrigido: (a) passou a persistir `ufsCompletas` no checkpoint, então um estado 100% feito nunca mais é re-consultado na ANP ao retomar; (b) pausa de 2s entre chamadas à ANP; (c) retry com backoff exponencial (até 6 tentativas) em caso de 429.
+
+**Resultado final, 2026-09-05**: 27/27 estados concluídos, 7.128 de 7.131 CNPJs processados. **De 38.599 postos no banco foram pra 42.970 (+4.371 postos novos, +11,3%)** — incluindo o Totalle Auto Posto que motivou a investigação, confirmado publicamente legível pela mesma chave `publishable` que o app usa (`lat=-21.7793879, lon=-48.1800079`, ~230m do ponto real do Google — precisão equivalente à das coordenadas que a própria ANP já fornece sem validação, ver seção 27.5).
+
+O `sync-anp` (seção 8) foi atualizado com a mesma lógica de fallback (sem `bairro`, desempate por CEP), limitada a 20 geocodificações por execução — cobre só o gotejamento diário de novos registros sem coordenada; o grosso do backlog já foi resolvido por este backfill único.
