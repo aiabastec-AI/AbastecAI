@@ -16,6 +16,7 @@ import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { NotaPin } from "../../src/components/NotaPin";
 import { buscarIdsPatrocinados } from "../../src/lib/patrocinios";
+import { buscarDadosGoogle, type DadosGoogle } from "../../src/lib/googlePosto";
 
 // Contraparte ".web.tsx" de posto/[id].tsx — o Expo Router prioriza este arquivo no build
 // web (mesmo mecanismo de index.web.tsx/mapa.tsx). Existe só porque a versão nativa passou
@@ -32,6 +33,7 @@ export default function FichaPosto() {
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [historico, setHistorico] = useState<HistoricoFiscalizacao>(HISTORICO_VAZIO);
   const [patrocinado, setPatrocinado] = useState(false);
+  const [google, setGoogle] = useState<DadosGoogle | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export default function FichaPosto() {
     buscarIdsPatrocinados([id], [])
       .then((ids) => setPatrocinado(ids.has(id)))
       .catch(() => {});
+    setGoogle(null);
+    buscarDadosGoogle(id).then(setGoogle);
   }, [id]);
 
   const totalInfracoes = historico.fiscalizacoes.reduce((soma, f) => soma + f.infracoes.length, 0);
@@ -159,6 +163,73 @@ export default function FichaPosto() {
             />
           )}
         </View>
+
+        {google?.encontrado && (
+          <View style={styles.secao}>
+            <Text style={styles.tituloSecao}>
+              <MaterialCommunityIcons name="google" size={18} color={colors.notaMedia} /> Google
+            </Text>
+            <View style={styles.googleCard}>
+              {google.nota != null && (
+                <View style={styles.googleNotaLinha}>
+                  <MaterialCommunityIcons name="star" size={18} color={colors.notaMedia} />
+                  <Text style={styles.googleNotaTexto}>{google.nota.toFixed(1)}</Text>
+                  {google.total_avaliacoes != null && (
+                    <Text style={styles.googleTotalTexto}>
+                      · {google.total_avaliacoes} avaliações
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {google.telefone && (
+                <Pressable
+                  style={styles.googleLinhaAcao}
+                  onPress={() => Linking.openURL(`tel:${google.telefone}`)}
+                >
+                  <MaterialCommunityIcons name="phone-outline" size={18} color={colors.textSecondary} />
+                  <Text style={styles.googleLinhaAcaoTexto}>{google.telefone}</Text>
+                </Pressable>
+              )}
+              {google.website && (
+                <Pressable style={styles.googleLinhaAcao} onPress={() => Linking.openURL(google.website!)}>
+                  <MaterialCommunityIcons name="web" size={18} color={colors.textSecondary} />
+                  <Text style={styles.googleLinhaAcaoTexto} numberOfLines={1}>
+                    {google.website}
+                  </Text>
+                </Pressable>
+              )}
+
+              {google.avaliacoes.length > 0 && (
+                <View style={styles.avaliacoesGoogleLista}>
+                  {google.avaliacoes.map((a, i) => (
+                    <View key={i} style={styles.avaliacaoGoogleItem}>
+                      <View style={styles.avaliacaoGoogleHeader}>
+                        <Text style={styles.avaliacaoGoogleAutor} numberOfLines={1}>
+                          {a.autor ?? "Anônimo"}
+                        </Text>
+                        {a.nota != null && (
+                          <View style={styles.avaliacaoGoogleNotaLinha}>
+                            <MaterialCommunityIcons name="star" size={13} color={colors.notaMedia} />
+                            <Text style={styles.avaliacaoGoogleNota}>{a.nota}</Text>
+                          </View>
+                        )}
+                      </View>
+                      {a.tempo_relativo && (
+                        <Text style={styles.avaliacaoGoogleTempo}>{a.tempo_relativo}</Text>
+                      )}
+                      {a.texto && (
+                        <Text style={styles.avaliacaoGoogleTexto} numberOfLines={4}>
+                          {a.texto}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         <View style={styles.secao}>
           <Text style={styles.tituloSecao}>
@@ -386,6 +457,32 @@ function criarEstilos(colors: ThemeColors) {
       },
       botaoSecundarioTexto: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
       texto: { ...tipografia.bodySm, color: colors.textSecondary },
+      googleCard: {
+        backgroundColor: colors.background,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.surfaceGlassBorder,
+        padding: 16,
+        gap: 14,
+      },
+      googleNotaLinha: { flexDirection: "row", alignItems: "center", gap: 6 },
+      googleNotaTexto: { ...tipografia.bodyMdSemiBold, color: colors.textPrimary },
+      googleTotalTexto: { ...tipografia.bodySm, color: colors.textSecondary },
+      googleLinhaAcao: { flexDirection: "row", alignItems: "center", gap: 10 },
+      googleLinhaAcaoTexto: { ...tipografia.bodySm, color: colors.textSecondary, flexShrink: 1 },
+      avaliacoesGoogleLista: {
+        gap: 14,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
+      avaliacaoGoogleItem: { gap: 4 },
+      avaliacaoGoogleHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+      avaliacaoGoogleAutor: { ...tipografia.bodyMdSemiBold, color: colors.textPrimary, flex: 1 },
+      avaliacaoGoogleNotaLinha: { flexDirection: "row", alignItems: "center", gap: 3 },
+      avaliacaoGoogleNota: { ...tipografia.bodySm, color: colors.textSecondary },
+      avaliacaoGoogleTempo: { ...tipografia.bodySm, color: colors.textSecondary, fontSize: 11 },
+      avaliacaoGoogleTexto: { ...tipografia.bodySm, color: colors.textSecondary },
     }),
   };
 }
