@@ -917,3 +917,35 @@ Script: `scripts/backfill-coordenadas-anp.js` — relê a API da ANP por UF (mes
 **Resultado final, 2026-09-05**: 27/27 estados concluídos, 7.128 de 7.131 CNPJs processados. **De 38.599 postos no banco foram pra 42.970 (+4.371 postos novos, +11,3%)** — incluindo o Totalle Auto Posto que motivou a investigação, confirmado publicamente legível pela mesma chave `publishable` que o app usa (`lat=-21.7793879, lon=-48.1800079`, ~230m do ponto real do Google — precisão equivalente à das coordenadas que a própria ANP já fornece sem validação, ver seção 27.5).
 
 O `sync-anp` (seção 8) foi atualizado com a mesma lógica de fallback (sem `bairro`, desempate por CEP), limitada a 20 geocodificações por execução — cobre só o gotejamento diário de novos registros sem coordenada; o grosso do backlog já foi resolvido por este backfill único.
+
+## 28. Reorganização da ficha do posto + logo da bandeira + versão 12→14 (2026-09-05/06)
+
+Pedido do usuário depois de testar a v12 no device real (ver seção 27.4): reordenar as seções da ficha, tirar o CNPJ do topo, e mostrar o logo de verdade da bandeira em vez de só o texto/ícone genérico.
+
+### 28.1 Nova ordem e logo da bandeira
+
+Ordem antiga: Endereço/CNPJ/Distribuidora → Google → Histórico ANP → Preços → Denunciar → Avaliações de usuários.
+Ordem nova: **Endereço+Bandeira (com logo) → Preços → Histórico ANP → Avaliações de usuários → Google → rodapé (CNPJ + Denunciar à ANP)**. CNPJ saiu do card do topo — não é a primeira coisa que o usuário procura — e foi pro rodapé da ficha, junto do botão de denúncia (mesmo "grupo" de informação administrativa).
+
+**Logo da bandeira**: `app/src/lib/logoBandeira.ts` mapeia o campo `bandeira` do posto pra uma imagem local em `app/assets/bandeiras/` (baixadas do Wikimedia Commons — Petrobras, Ipiranga, Shell, Ale — e convertidas de SVG pra PNG via Chrome headless/Playwright, já que o projeto não tem `react-native-svg` instalado e isso evitaria rebuild nativo). Cobre as 4 bandeiras mais comuns no banco (~90% dos postos com bandeira definida). Achado importante: **`VIBRA` e `RAIZEN` são distribuidoras, não a marca que aparece na bomba** — confirmado no caso real do Totalle (seção 27.5), onde `distribuidora=VIBRA` corresponde a um posto de bandeira "Petrobras" de verdade no Google. Por isso o mapeamento é `VIBRA→logo Petrobras` e `RAIZEN→logo Shell`, não logos "Vibra"/"Raízen" (que o consumidor nunca vê na prática). Postos "BANDEIRA BRANCA" ou distribuidoras regionais menores continuam com o ícone genérico de loja.
+
+Aplicado nos dois arquivos da ficha ([id].tsx nativo e [id].web.tsx), mesma paridade mantida a sessão inteira.
+
+### 28.2 Bug real encontrado depois do teste em device: rodapé atrás da barra de navegação
+
+Usuário testou a v13 no celular e reportou que o CNPJ/botão "Denunciar à ANP" ficavam parcialmente escondidos atrás da barra de navegação do sistema (gestos/3 botões). Causa: o rodapé novo (seção 28.1) não tinha padding pra `insets.bottom` — outras telas do app (`index.tsx`, `filtros.tsx`) já usam `useSafeAreaInsets()` do `react-native-safe-area-context` (já uma dependência instalada, sem precisar de rebuild nativo) exatamente pra esse tipo de caso, só que a ficha do posto nunca tinha precisado disso porque não tinha conteúdo "preso" no final antes. Corrigido replicando o mesmo padrão: `insets.bottom` passado pro `criarEstilos()` e aplicado como `paddingBottom` no estilo do rodapé.
+
+### 28.3 Ciclo de build: v12 (nunca publicada) → v13 (nunca publicada) → v14
+
+Com a `sync-anp`/backfill de coordenadas prontos (seção 27) e o Google na ficha (seção 27.1-27.4), o usuário decidiu ir de submissão manual no Play Console (sem chave de conta de serviço configurada pro `eas submit`) em vez de automatizar a subida:
+
+- **v12**: primeiro build de produção da sessão, gerado logo depois do enriquecimento Google + fix de coordenadas. Testado em device físico real (não só emulador — a máquina ficou sem RAM duas vezes tentando emulador, mesmo problema de memória da seção 27.6) via `bundletool` extraindo um APK universal assinado com keystore de debug local (Maps não funciona nesse teste por SHA-1 não bater com o cadastrado no GCP — limitação conhecida, não bug real). Aprovada, mas o usuário pediu mudanças de layout antes de subir (seção 28.1) — **nunca chegou a ser publicada**.
+- **v13**: gerada com a reorganização de layout + logos. Testada e aprovada no device físico (logo da Ipiranga confirmado renderizando). Usuário então notou o bug do rodapé (seção 28.2) — **também nunca publicada**.
+- **v14**: com o fix do `insets.bottom`. Testada no mesmo device físico, confirmado visualmente que CNPJ/Denunciar ficam com espaço acima da barra de navegação. **Essa é a que foi de fato indicada pro usuário subir no Play Console.**
+
+Todos os `.aab` ficam em `G:\dev\AbastecAI-builds\android\` (fora do repo, convenção já estabelecida desde a seção 18), nome `abastecai-production-v{N}.aab`. Cada rodada: `git commit` + `git push origin main` (Vercel redeploya sozinha via integração Git — confirmado no painel, deploy novo aparece segundos depois do push) + `eas build --platform android --profile production --non-interactive` (versionCode auto-incrementado via `appVersionSource: remote` do `eas.json`) + download do `.aab` + `bundletool build-apks --mode=universal` + `adb install` no device físico + navegação por deep link (`abastecai://posto/<id>`) + `adb exec-out screencap` pra confirmação visual real, não só inferida pelo código.
+
+**Notas de versão preparadas pro usuário colar no Play Console** (cobrindo v11→v14, já que nenhuma intermediária foi publicada):
+> Mais de 4.300 postos que não apareciam no mapa por falta de coordenada nos dados oficiais agora estão visíveis.
+>
+> A ficha de cada posto agora mostra nota, comentários, telefone e horário de funcionamento do Google, além do logo da bandeira (Petrobras, Ipiranga, Shell, Ale). Reorganizamos a ordem das informações pra facilitar achar o que importa primeiro.
