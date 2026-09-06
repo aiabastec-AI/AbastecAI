@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { corDaNota, glowDaNota, type ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
@@ -33,7 +34,8 @@ export default function FichaPosto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, modo: modoTema } = useTheme();
-  const styles = useMemo(() => criarEstilos(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
   const mapRef = useRef<MapView | null>(null);
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [historico, setHistorico] = useState<HistoricoFiscalizacao>(HISTORICO_VAZIO);
@@ -419,7 +421,7 @@ function LinhaIcone({
   );
 }
 
-function criarEstilos(colors: ThemeColors) {
+function criarEstilos(colors: ThemeColors, insetBottom: number) {
   return {
     cores: colors,
     ...StyleSheet.create({
@@ -521,7 +523,7 @@ function criarEstilos(colors: ThemeColors) {
       linhaIcone: { flexDirection: "row", alignItems: "flex-start", gap: 14 },
       linhaTextos: { flex: 1, gap: 3 },
       logoBandeiraImg: { width: 40, height: 24 },
-      rodape: { gap: 12, marginTop: 4 },
+      rodape: { gap: 12, marginTop: 4, paddingBottom: insetBottom },
       rodapeCnpj: { ...tipografia.bodySm, color: colors.textSecondary, textAlign: "center" },
       linhaLabel: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 10 },
       linhaValor: { ...tipografia.bodyMd, color: colors.textPrimary },

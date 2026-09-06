@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { corDaNota, glowDaNota, type ThemeColors } from "../../src/theme";
 import { useTheme } from "../../src/lib/ThemeProvider";
@@ -31,7 +32,8 @@ const HISTORICO_VAZIO: HistoricoFiscalizacao = { fiscalizacoes: [], amostras: []
 export default function FichaPosto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
-  const styles = useMemo(() => criarEstilos(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => criarEstilos(colors, insets.bottom), [colors, insets.bottom]);
   const [posto, setPosto] = useState<PostoDetalhe | null | undefined>(undefined);
   const [historico, setHistorico] = useState<HistoricoFiscalizacao>(HISTORICO_VAZIO);
   const [patrocinado, setPatrocinado] = useState(false);
@@ -319,7 +321,7 @@ function LinhaIcone({
   );
 }
 
-function criarEstilos(colors: ThemeColors) {
+function criarEstilos(colors: ThemeColors, insetBottom: number) {
   return {
     cores: colors,
     ...StyleSheet.create({
@@ -424,7 +426,7 @@ function criarEstilos(colors: ThemeColors) {
       linhaIcone: { flexDirection: "row", alignItems: "flex-start", gap: 14 },
       linhaTextos: { flex: 1, gap: 3 },
       logoBandeiraImg: { width: 40, height: 24 },
-      rodape: { gap: 12, marginTop: 4 },
+      rodape: { gap: 12, marginTop: 4, paddingBottom: insetBottom },
       rodapeCnpj: { ...tipografia.bodySm, color: colors.textSecondary, textAlign: "center" },
       linhaLabel: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 10 },
       linhaValor: { ...tipografia.bodyMd, color: colors.textPrimary },
