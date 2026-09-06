@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -20,6 +20,7 @@ import { BotaoVoltar } from "../../src/components/BotaoVoltar";
 import { SecaoAvaliacoes } from "../../src/components/SecaoAvaliacoes";
 import { SecaoPrecos } from "../../src/components/SecaoPrecos";
 import { buscarDadosGoogle, type DadosGoogle } from "../../src/lib/googlePosto";
+import { logoBandeira } from "../../src/lib/logoBandeira";
 import { PinMapa } from "../../src/components/PinMapa";
 import { NotaPin } from "../../src/components/NotaPin";
 import { SheetArrastavel } from "../../src/components/SheetArrastavel";
@@ -104,6 +105,7 @@ export default function FichaPosto() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`
     : null;
   const corNota = corDaNota(posto.nota_anp, colors);
+  const logoBandeiraSrc = logoBandeira(posto.bandeira);
 
   async function aoTracarRota() {
     if (calculandoRota) return;
@@ -244,16 +246,74 @@ export default function FichaPosto() {
               valor={endereco}
             />
           )}
-          <LinhaIcone estilos={styles} icone="card-account-details-outline" label="CNPJ" valor={posto.cnpj} />
           {posto.distribuidora_atual && (
-            <LinhaIcone
-              estilos={styles}
-              icone="storefront-outline"
-              label="Distribuidora"
-              valor={posto.distribuidora_atual}
-            />
+            <View style={styles.linhaIcone}>
+              {logoBandeiraSrc ? (
+                <Image source={logoBandeiraSrc} style={styles.logoBandeiraImg} resizeMode="contain" />
+              ) : (
+                <MaterialCommunityIcons name="storefront-outline" size={24} color={colors.textSecondary} />
+              )}
+              <View style={styles.linhaTextos}>
+                <Text style={styles.linhaLabel}>Distribuidora</Text>
+                <Text style={styles.linhaValor}>{posto.distribuidora_atual}</Text>
+              </View>
+            </View>
           )}
         </View>
+
+        <SecaoPrecos postoId={posto.id} />
+
+        <View style={styles.secao}>
+          <Text style={styles.tituloSecao}>
+            <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.eletrico} /> Histórico ANP
+          </Text>
+          <View style={styles.historicoCard}>
+            {semHistorico ? (
+              <Text style={styles.texto}>
+                Ainda não fiscalizado pela ANP nos últimos 5 anos.
+              </Text>
+            ) : (
+              <>
+                <View style={styles.resumoHistorico}>
+                  <Text style={styles.resumoNumero}>{historico.fiscalizacoes.length}</Text>
+                  <Text style={styles.resumoLabel}>fiscalizações</Text>
+                  <Text style={styles.resumoNumero}>{totalInfracoes}</Text>
+                  <Text style={styles.resumoLabel}>infrações</Text>
+                  <Text style={styles.resumoNumero}>{totalAmostrasNaoConformes}</Text>
+                  <Text style={styles.resumoLabel}>amostras não conformes</Text>
+                </View>
+                {(historicoExpandido
+                  ? historico.fiscalizacoes
+                  : historico.fiscalizacoes.slice(0, HISTORICO_VISIVEL_INICIAL)
+                ).map((f) => (
+                  <View key={f.id} style={styles.registroHistorico}>
+                    <View style={styles.registroTextos}>
+                      <Text style={styles.registroTitulo}>
+                        {f.infracoes.length === 0 ? "Fiscalização sem infração" : "Infração registrada"}
+                      </Text>
+                      <Text style={styles.registroData}>
+                        {f.data_fiscalizacao ?? "Data não informada"}
+                        {f.numero_df ? ` · DF ${f.numero_df}` : ""}
+                      </Text>
+                    </View>
+                    <Text style={[styles.statusHistorico, { color: f.infracoes.length === 0 ? colors.notaAlta : colors.notaBaixa }]}>
+                      {f.infracoes.length === 0 ? "Aprovado" : "Verificar"}
+                    </Text>
+                  </View>
+                ))}
+                {!historicoExpandido && historico.fiscalizacoes.length > HISTORICO_VISIVEL_INICIAL && (
+                  <Pressable onPress={() => setHistoricoExpandido(true)}>
+                    <Text style={styles.verMaisTexto}>
+                      Ver mais {historico.fiscalizacoes.length - HISTORICO_VISIVEL_INICIAL}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+
+        <SecaoAvaliacoes alvo={{ tipo: "posto", id: posto.id }} />
 
         {google?.encontrado && (
           <View style={styles.secao}>
@@ -322,67 +382,16 @@ export default function FichaPosto() {
           </View>
         )}
 
-        <View style={styles.secao}>
-          <Text style={styles.tituloSecao}>
-            <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.eletrico} /> Histórico ANP
-          </Text>
-          <View style={styles.historicoCard}>
-            {semHistorico ? (
-              <Text style={styles.texto}>
-                Ainda não fiscalizado pela ANP nos últimos 5 anos.
-              </Text>
-            ) : (
-              <>
-                <View style={styles.resumoHistorico}>
-                  <Text style={styles.resumoNumero}>{historico.fiscalizacoes.length}</Text>
-                  <Text style={styles.resumoLabel}>fiscalizações</Text>
-                  <Text style={styles.resumoNumero}>{totalInfracoes}</Text>
-                  <Text style={styles.resumoLabel}>infrações</Text>
-                  <Text style={styles.resumoNumero}>{totalAmostrasNaoConformes}</Text>
-                  <Text style={styles.resumoLabel}>amostras não conformes</Text>
-                </View>
-                {(historicoExpandido
-                  ? historico.fiscalizacoes
-                  : historico.fiscalizacoes.slice(0, HISTORICO_VISIVEL_INICIAL)
-                ).map((f) => (
-                  <View key={f.id} style={styles.registroHistorico}>
-                    <View style={styles.registroTextos}>
-                      <Text style={styles.registroTitulo}>
-                        {f.infracoes.length === 0 ? "Fiscalização sem infração" : "Infração registrada"}
-                      </Text>
-                      <Text style={styles.registroData}>
-                        {f.data_fiscalizacao ?? "Data não informada"}
-                        {f.numero_df ? ` · DF ${f.numero_df}` : ""}
-                      </Text>
-                    </View>
-                    <Text style={[styles.statusHistorico, { color: f.infracoes.length === 0 ? colors.notaAlta : colors.notaBaixa }]}>
-                      {f.infracoes.length === 0 ? "Aprovado" : "Verificar"}
-                    </Text>
-                  </View>
-                ))}
-                {!historicoExpandido && historico.fiscalizacoes.length > HISTORICO_VISIVEL_INICIAL && (
-                  <Pressable onPress={() => setHistoricoExpandido(true)}>
-                    <Text style={styles.verMaisTexto}>
-                      Ver mais {historico.fiscalizacoes.length - HISTORICO_VISIVEL_INICIAL}
-                    </Text>
-                  </Pressable>
-                )}
-              </>
-            )}
-          </View>
+        <View style={styles.rodape}>
+          <Text style={styles.rodapeCnpj}>CNPJ {posto.cnpj}</Text>
+          <Pressable
+            style={styles.botaoSecundario}
+            onPress={() => Linking.openURL("https://www.gov.br/anp/pt-br/canais_atendimento/fale-conosco")}
+          >
+            <MaterialCommunityIcons name="alert-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.botaoSecundarioTexto}>Denunciar à ANP</Text>
+          </Pressable>
         </View>
-
-        <SecaoPrecos postoId={posto.id} />
-
-        <Pressable
-          style={styles.botaoSecundario}
-          onPress={() => Linking.openURL("https://www.gov.br/anp/pt-br/canais_atendimento/fale-conosco")}
-        >
-          <MaterialCommunityIcons name="alert-outline" size={18} color={colors.textSecondary} />
-          <Text style={styles.botaoSecundarioTexto}>Denunciar à ANP</Text>
-        </Pressable>
-
-        <SecaoAvaliacoes alvo={{ tipo: "posto", id: posto.id }} />
       </SheetArrastavel>
     </View>
   );
@@ -511,6 +520,9 @@ function criarEstilos(colors: ThemeColors) {
       },
       linhaIcone: { flexDirection: "row", alignItems: "flex-start", gap: 14 },
       linhaTextos: { flex: 1, gap: 3 },
+      logoBandeiraImg: { width: 40, height: 24 },
+      rodape: { gap: 12, marginTop: 4 },
+      rodapeCnpj: { ...tipografia.bodySm, color: colors.textSecondary, textAlign: "center" },
       linhaLabel: { ...tipografia.labelCaps, color: colors.textSecondary, fontSize: 10 },
       linhaValor: { ...tipografia.bodyMd, color: colors.textPrimary },
       secao: { gap: 12 },
