@@ -930,7 +930,18 @@ Usuário reportou que o Totalle Auto Posto (número 327) aparecia sobreposto ao 
 
 **Custo**: cotado com o usuário antes de implementar — SKU Essentials do Google Geocoding, 10.000 chamadas grátis/mês, US$5/1.000 depois disso. Decisão: não substituir o Nominatim (que continua sendo tentado primeiro, de graça), só usar o Google como fallback condicional. Mesmo num cenário extremo de 100% do backlog nacional (~7.131 CNPJs) precisando do fallback, ficaria dentro da cota grátis.
 
-**Auditoria do backlog já processado** (`scripts/auditar-coordenadas-anp.js`, criado nesta sessão): revarre os mesmos ~7.131 CNPJs sem coordenada nativa da ANP, aplica a mesma checagem de precisão contra o Nominatim (consulta nova, já que o backfill original não guardou o metadado de precisão de cada registro) e só aciona o Google — corrigindo o `postos.localizacao` — nos casos que não bateram o número da casa. Gera dois relatórios locais (não versionados): `auditoria-coordenadas-corrigidos.csv` (o que o Google corrigiu de fato) e `auditoria-coordenadas-revisar.csv` (nenhum dos dois geocodificadores resolveu com precisão — candidatos a revisão manual, como era o caso do Totalle antes deste fix). Checkpoint em disco (`auditoria-coordenadas-progresso.json`), retomável. **Disparada em background nesta sessão (2026-09-07, ~12:40) — resultado final ainda não confirmado**; amostra inicial (AC+AL, 51 CNPJs) mostrou uma taxa de correção via Google bem mais alta do que o esperado (~29%, não uma fração pequena), o que ainda assim cabe na cota grátis.
+**Auditoria do backlog já processado** (`scripts/auditar-coordenadas-anp.js`, criado nesta sessão): revarre os mesmos ~7.131 CNPJs sem coordenada nativa da ANP, aplica a mesma checagem de precisão contra o Nominatim (consulta nova, já que o backfill original não guardou o metadado de precisão de cada registro) e só aciona o Google — corrigindo o `postos.localizacao` — nos casos que não bateram o número da casa. Gera dois relatórios locais (não versionados): `auditoria-coordenadas-corrigidos.csv` (o que o Google corrigiu de fato) e `auditoria-coordenadas-revisar.csv` (nenhum dos dois geocodificadores resolveu com precisão — candidatos a revisão manual, como era o caso do Totalle antes deste fix). Checkpoint em disco (`auditoria-coordenadas-progresso.json`), retomável.
+
+**Resultado final** (rodou de 12:40 às 17:34, 27/27 estados, 7.128 CNPJs auditados):
+
+| Categoria | Quantidade | % |
+|---|---|---|
+| Já precisos no Nominatim (nenhum custo) | 876 | 12,3% |
+| **Corrigidos via Google** | **3.198** | **44,9%** |
+| Continuam imprecisos (nenhum dos dois bateu o número) | 1.129 | 15,8% |
+| Sem nenhuma correspondência (endereço genuinamente sem match) | 1.925 | 27,0% |
+
+A taxa de correção real (45%) ficou bem mais alta que a estimativa inicial de amostra (~29%) — o problema do Totalle era mais disseminado do que parecia. Mesmo assim, **3.198 chamadas ao Google Geocoding ficaram dentro da cota grátis de 10.000/mês, custo final: zero**. Os 1.129 casos que continuam imprecisos ficam registrados em `auditoria-coordenadas-revisar.csv` pra uma eventual revisão manual futura — não foram sobrescritos com nada pior do que já tinham.
 
 ## 28. Reorganização da ficha do posto + logo da bandeira + versão 12→14 (2026-09-05/06)
 
