@@ -11,10 +11,20 @@
 // upsert em `postos` por `cnpj` com a coordenada encontrada. Descarta resultado que só
 // resolveu a nível de cidade/administrativo (impreciso demais pra um pin de posto).
 //
+// Fallback pago (Google Geocoding, opcional via GOOGLE_BACKEND_API_KEY): o Nominatim às
+// vezes só tem o segmento de rua inteiro mapeado, sem numeração interpolada — pra esses
+// casos ele devolve o mesmo ponto pra qualquer número da mesma rua (achado real: o Totalle
+// Auto Posto, motivo original deste script, caiu sobreposto num posto a ~2 quarteirões de
+// distância real). Por isso o resultado do Nominatim só é aceito quando bate o número da
+// casa; senão, tenta o Google (ROOFTOP/RANGE_INTERPOLATED). Dentro do volume desse backlog
+// (~7 mil CNPJs) isso fica inteiro dentro da cota grátis do Google (10.000/mês) — ver
+// ARQUITETURA.md seção 27.7.
+//
 // Roda ~2h (7 mil endereços a 1 req/s) — grava progresso em disco (`--resume` retoma sem
 // repetir CNPJs já processados nesta rodada).
 //
-// Rodar (precisa de SUPABASE_URL, SUPABASE_SECRET_KEY no ambiente ou no .env.local da raiz):
+// Rodar (precisa de SUPABASE_URL, SUPABASE_SECRET_KEY no ambiente ou no .env.local da raiz;
+// GOOGLE_BACKEND_API_KEY opcional, mas recomendada, pro fallback de precisão):
 //   node scripts/backfill-coordenadas-anp.js
 
 const path = require("path");
@@ -35,10 +45,19 @@ function lerEnvLocal() {
 const envLocal = lerEnvLocal();
 const SUPABASE_URL = envLocal.SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SECRET_KEY = envLocal.SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY;
+// Opcional: sem ela o script continua funcionando só com Nominatim (comportamento antigo),
+// apenas sem o fallback pros casos em que o Nominatim resolve o endereço a nível de rua
+// inteira em vez do número da casa (achado real no caso do Totalle Auto Posto — ver
+// ARQUITETURA.md seção 27.7). Dentro do volume desse backlog (~7 mil CNPJs) o fallback fica
+// inteiro dentro da cota grátis do Google Geocoding (10.000 chamadas/mês).
+const GOOGLE_BACKEND_API_KEY = envLocal.GOOGLE_BACKEND_API_KEY || process.env.GOOGLE_BACKEND_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
   console.error("Faltam SUPABASE_URL / SUPABASE_SECRET_KEY.");
   process.exit(1);
+}
+if (!GOOGLE_BACKEND_API_KEY) {
+  console.warn("GOOGLE_BACKEND_API_KEY não definida — rodando só com Nominatim, sem fallback de precisão.");
 }
 
 const HEADERS = {
@@ -108,31 +127,109 @@ function apenasDigitos(texto) {
   return (texto || "").replace(/\D/g, "");
 }
 
+// Pega o número da casa a partir de `complemento` (quando a ANP separa) ou do último grupo
+// de dígitos em `endereco` (formato mais comum: "AVENIDA X,  327"). `null` quando o endereço
+// genuinamente não tem número (rural, "S/N") — nesse caso não dá pra exigir match de
+// house_number, e a checagem de precisão abaixo é pulada.
+function extrairNumero(endereco, complemento) {
+  const fonte = (complemento && complemento.trim()) || endereco || "";
+  const m = fonte.match(/(\d+)(?!.*\d)/);
+  return m ? m[1] : null;
+}
+
+// Só aceita o resultado do Nominatim como preciso se ele resolveu até o número da casa —
+// achado real no caso do Totalle Auto Posto (Araraquara/SP): pra esse trecho de avenida o
+// OSM só tem o segmento de rua inteiro mapeado, sem numeração interpolada, então qualquer
+// número devolvia o mesmo ponto (o centro do segmento) — postos a ~2 quarteirões de
+// distância real caíam sobrepostos no mapa. Ver ARQUITETURA.md seção 27.7.
+function precisaoOk(candidato, numeroAlvo) {
+  if (!numeroAlvo) return true;
+  const casaEncontrada = apenasDigitos(candidato?.address?.house_number);
+  return casaEncontrada !== "" && casaEncontrada === numeroAlvo;
+}
+
 // Importante: NÃO inclui `bairro` na busca — testado contra o caso real que motivou esse
 // script (Totalle Auto Posto, Araraquara/SP) e incluir o bairro da ANP zera o resultado,
 // porque o nome de bairro da ANP às vezes não bate com o nome de bairro que o OSM usa pro
 // mesmo trecho de rua (ex.: ANP diz "CENTRO", OSM diz "Vila Ferroviária" pro mesmo lugar).
 // Ruas longas (avenidas) retornam vários trechos com CEPs diferentes — desempata pelo CEP
 // que a própria ANP informou, quando bate com algum resultado.
-async function geocodificar(endereco, municipio, uf, cep) {
+async function consultarNominatim(endereco, municipio, uf, cep) {
   const consulta = [endereco, municipio, uf, "Brasil"].filter(Boolean).join(", ");
   const url = `${NOMINATIM_URL}?format=json&limit=5&countrycodes=br&addressdetails=1&q=${encodeURIComponent(consulta)}`;
   const resposta = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-  if (!resposta.ok) return { resultado: null, motivo: `http_${resposta.status}` };
+  if (!resposta.ok) return { resultado: null, candidato: null, motivo: `http_${resposta.status}` };
   const dados = await resposta.json();
-  if (!dados.length) return { resultado: null, motivo: "sem_resultado" };
+  if (!dados.length) return { resultado: null, candidato: null, motivo: "sem_resultado" };
 
   const cepAlvo = apenasDigitos(cep);
   const porCep = cepAlvo ? dados.find((r) => apenasDigitos(r.address?.postcode) === cepAlvo) : null;
   const r = porCep ?? dados[0];
 
   if (TIPOS_MUITO_GENERICOS.has(r.type) || TIPOS_MUITO_GENERICOS.has(r.class)) {
-    return { resultado: null, motivo: `generico_demais(${r.class}/${r.type})` };
+    return { resultado: null, candidato: r, motivo: `generico_demais(${r.class}/${r.type})` };
   }
   return {
     resultado: { lat: parseFloat(r.lat), lng: parseFloat(r.lon) },
+    candidato: r,
     motivo: porCep ? "ok_por_cep" : "ok_primeiro_resultado",
   };
+}
+
+// Fallback pago (Google Geocoding, ~US$5/1.000 chamadas acima da cota grátis de 10.000/mês)
+// — só é chamado quando o Nominatim não resolveu até o número da casa. Só aceita
+// location_type ROOFTOP/RANGE_INTERPOLATED (as duas precisões de nível de endereço do
+// Google; GEOMETRIC_CENTER/APPROXIMATE têm o mesmo problema de imprecisão do Nominatim) e,
+// quando dá pra saber o número alvo, confirma que bate com o `street_number` devolvido.
+async function geocodificarGoogle(endereco, municipio, uf, numeroAlvo) {
+  if (!GOOGLE_BACKEND_API_KEY) return { resultado: null, motivo: "sem_chave_google" };
+  const consulta = [endereco, municipio, uf, "Brasil"].filter(Boolean).join(", ");
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(consulta)}&key=${GOOGLE_BACKEND_API_KEY}`;
+  const resposta = await fetch(url);
+  if (!resposta.ok) return { resultado: null, motivo: `google_http_${resposta.status}` };
+  const dados = await resposta.json();
+  if (dados.status !== "OK" || !dados.results?.length) {
+    return { resultado: null, motivo: `google_${dados.status}` };
+  }
+  const r = dados.results[0];
+  const tipo = r.geometry?.location_type;
+  if (tipo !== "ROOFTOP" && tipo !== "RANGE_INTERPOLATED") {
+    return { resultado: null, motivo: `google_impreciso(${tipo})` };
+  }
+  if (numeroAlvo) {
+    const componenteNumero = r.address_components?.find((c) => c.types.includes("street_number"));
+    if (!componenteNumero || apenasDigitos(componenteNumero.long_name) !== numeroAlvo) {
+      return { resultado: null, motivo: "google_numero_nao_bate" };
+    }
+  }
+  return {
+    resultado: { lat: r.geometry.location.lat, lng: r.geometry.location.lng },
+    motivo: `google_${tipo.toLowerCase()}`,
+  };
+}
+
+// Orquestra: tenta Nominatim (grátis) primeiro; só recorre ao Google quando o Nominatim não
+// resolveu até o número da casa. Se nenhum dos dois for preciso mas o Nominatim ao menos
+// devolveu algo não-genérico, mantém esse resultado (melhor um posto no mapa com posição
+// aproximada do que sumido — mesma lógica que motivou esse backfill, ver ARQUITETURA.md
+// seção 27.5) e marca `impreciso: true` pra entrar no relatório de revisão manual.
+async function geocodificarComFallback(endereco, complemento, municipio, uf, cep) {
+  const numeroAlvo = extrairNumero(endereco, complemento);
+  const nominatim = await consultarNominatim(endereco, municipio, uf, cep);
+
+  if (nominatim.resultado && precisaoOk(nominatim.candidato, numeroAlvo)) {
+    return { resultado: nominatim.resultado, motivo: nominatim.motivo, impreciso: false };
+  }
+
+  const google = await geocodificarGoogle(endereco, municipio, uf, numeroAlvo);
+  if (google.resultado) {
+    return { resultado: google.resultado, motivo: google.motivo, impreciso: false };
+  }
+
+  if (nominatim.resultado) {
+    return { resultado: nominatim.resultado, motivo: `${nominatim.motivo}+${google.motivo}`, impreciso: true };
+  }
+  return { resultado: null, motivo: `${nominatim.motivo}+${google.motivo}`, impreciso: false };
 }
 
 function montarLinhaPosto(registro, coord) {
@@ -194,7 +291,7 @@ async function main() {
     `Retomando com ${processados.size} CNPJs já processados e ${ufsCompletas.size} UFs já concluídas nesta rodada.`
   );
 
-  const contadores = { semCoordenada: 0, geocodificados: 0, naoEncontrados: 0, semEndereco: 0 };
+  const contadores = { semCoordenada: 0, geocodificados: 0, naoEncontrados: 0, semEndereco: 0, imprecisos: 0, viaGoogle: 0 };
 
   try {
     for (const uf of UFS) {
@@ -218,8 +315,9 @@ async function main() {
             continue;
           }
 
-          const { resultado, motivo } = await geocodificar(
+          const { resultado, motivo, impreciso } = await geocodificarComFallback(
             registro.endereco,
+            registro.complemento,
             registro.municipio,
             registro.uf,
             registro.cep
@@ -234,12 +332,14 @@ async function main() {
 
           await upsertPosto(montarLinhaPosto(registro, resultado));
           contadores.geocodificados++;
+          if (impreciso) contadores.imprecisos++;
+          if (motivo?.startsWith("google_")) contadores.viaGoogle++;
           processados.add(registro.cnpj);
 
           if ((contadores.geocodificados + contadores.naoEncontrados) % 25 === 0) {
             salvarProgresso(processados, ufsCompletas);
             console.log(
-              `[${uf}] geocodificados=${contadores.geocodificados} não_encontrados=${contadores.naoEncontrados} sem_endereço=${contadores.semEndereco} (última tentativa: ${motivo ?? "ok"})`
+              `[${uf}] geocodificados=${contadores.geocodificados} (google=${contadores.viaGoogle}, imprecisos=${contadores.imprecisos}) não_encontrados=${contadores.naoEncontrados} sem_endereço=${contadores.semEndereco} (última tentativa: ${motivo ?? "ok"})`
             );
           }
         }

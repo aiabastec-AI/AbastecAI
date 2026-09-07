@@ -16,6 +16,12 @@ scripts/dados/
 scripts/backfill-coordenadas.log
 scripts/backfill-coordenadas-progresso.json
 
+# Idem, pra auditoria de precisão que revê o mesmo backlog + relatórios que ela gera
+scripts/auditoria-coordenadas-progresso.json
+scripts/auditoria-coordenadas-corrigidos.csv
+scripts/auditoria-coordenadas-revisar.csv
+scripts/auditoria-coordenadas.log
+
 # Builds baixados da EAS (binários grandes, não fazem sentido versionar)
 *.aab
 *.apk

@@ -18,6 +18,11 @@ const PAGE_SIZE_ANP = 5000; // fixo pela API, não é parâmetro
 // execução existe pra não estourar o tempo da Edge Function num dia com muitos casos
 // novos — o grosso do backlog (7 mil+) é resolvido à parte pelo
 // scripts/backfill-coordenadas-anp.js; isso aqui só cobre o gotejamento diário.
+//
+// Quando o Nominatim só resolve o endereço a nível de segmento de rua (sem numeração
+// interpolada pra aquele trecho), cai pro Google Geocoding (GOOGLE_BACKEND_API_KEY, já
+// configurada no projeto pro enriquecer-google-posto) — ver ARQUITETURA.md seção 27.7.
+// Volume diário baixo (teto de 20 geocodificações/execução), fica de graça na prática.
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const NOMINATIM_USER_AGENT = "AbastecAI-sync-anp/1.0 (contato: chicolicia@gmail.com)";
 const NOMINATIM_INTERVALO_MS = 1100;
@@ -25,6 +30,7 @@ const MAX_GEOCODIFICACOES_POR_EXECUCAO = 20;
 const TIPOS_MUITO_GENERICOS = new Set([
   "administrative", "city", "town", "village", "state", "country", "county", "postcode",
 ]);
+const GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 
 interface RegistroAnp {
   cnpj: string;
@@ -71,32 +77,109 @@ function apenasDigitos(texto: string | undefined): string {
   return (texto ?? "").replace(/\D/g, "");
 }
 
+// Pega o número da casa a partir de `complemento` (quando a ANP separa) ou do último grupo
+// de dígitos em `endereco` (formato mais comum: "AVENIDA X,  327"). `null` quando o endereço
+// genuinamente não tem número (rural, "S/N").
+function extrairNumero(endereco: string, complemento: string): string | null {
+  const fonte = (complemento && complemento.trim()) || endereco || "";
+  const m = fonte.match(/(\d+)(?!.*\d)/);
+  return m ? m[1] : null;
+}
+
+interface CandidatoNominatim {
+  lat: string;
+  lon: string;
+  type: string;
+  class: string;
+  address?: { postcode?: string; house_number?: string };
+}
+
 // NÃO inclui `bairro` na busca — o nome de bairro da ANP às vezes não bate com o nome que
 // o OSM usa pro mesmo trecho de rua, e isso zera o resultado do Nominatim (achado testando
 // contra o caso real do Totalle Auto Posto, Araraquara/SP — ver ARQUITETURA.md seção 27).
 // Avenidas longas retornam vários trechos com CEPs diferentes — desempata pelo CEP que a
 // própria ANP informou.
-async function geocodificarEndereco(
+async function consultarNominatim(
   endereco: string,
   municipio: string,
   uf: string,
   cep: string
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<{ resultado: { lat: number; lng: number } | null; candidato: CandidatoNominatim | null }> {
   const consulta = [endereco, municipio, uf, "Brasil"].filter(Boolean).join(", ");
   const url = `${NOMINATIM_URL}?format=json&limit=5&countrycodes=br&addressdetails=1&q=${encodeURIComponent(consulta)}`;
   const resposta = await fetch(url, { headers: { "User-Agent": NOMINATIM_USER_AGENT } });
-  if (!resposta.ok) return null;
-  const dados = await resposta.json();
-  if (!dados.length) return null;
+  if (!resposta.ok) return { resultado: null, candidato: null };
+  const dados: CandidatoNominatim[] = await resposta.json();
+  if (!dados.length) return { resultado: null, candidato: null };
 
   const cepAlvo = apenasDigitos(cep);
-  const porCep = cepAlvo
-    ? dados.find((r: { address?: { postcode?: string } }) => apenasDigitos(r.address?.postcode) === cepAlvo)
-    : null;
+  const porCep = cepAlvo ? dados.find((r) => apenasDigitos(r.address?.postcode) === cepAlvo) : null;
   const r = porCep ?? dados[0];
 
-  if (TIPOS_MUITO_GENERICOS.has(r.type) || TIPOS_MUITO_GENERICOS.has(r.class)) return null;
-  return { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+  if (TIPOS_MUITO_GENERICOS.has(r.type) || TIPOS_MUITO_GENERICOS.has(r.class)) {
+    return { resultado: null, candidato: r };
+  }
+  return { resultado: { lat: parseFloat(r.lat), lng: parseFloat(r.lon) }, candidato: r };
+}
+
+// Só aceita o resultado do Nominatim como preciso se ele resolveu até o número da casa —
+// senão, pra esse trecho de rua o OSM só tem o segmento inteiro mapeado, sem numeração
+// interpolada, e devolve o mesmo ponto pra qualquer número (achado real do Totalle Auto
+// Posto, Araraquara/SP — ver ARQUITETURA.md seção 27.7).
+function precisaoOk(candidato: CandidatoNominatim | null, numeroAlvo: string | null): boolean {
+  if (!numeroAlvo) return true;
+  const casaEncontrada = apenasDigitos(candidato?.address?.house_number);
+  return casaEncontrada !== "" && casaEncontrada === numeroAlvo;
+}
+
+// Fallback pago (~US$5/1.000 chamadas acima da cota grátis de 10.000/mês) — só chamado
+// quando o Nominatim não resolveu até o número da casa. Só aceita location_type
+// ROOFTOP/RANGE_INTERPOLATED e confirma o `street_number` quando dá pra saber o alvo.
+async function geocodificarGoogle(
+  endereco: string,
+  municipio: string,
+  uf: string,
+  numeroAlvo: string | null,
+): Promise<{ lat: number; lng: number } | null> {
+  const chave = Deno.env.get("GOOGLE_BACKEND_API_KEY");
+  if (!chave) return null;
+  const consulta = [endereco, municipio, uf, "Brasil"].filter(Boolean).join(", ");
+  const url = `${GOOGLE_GEOCODE_URL}?address=${encodeURIComponent(consulta)}&key=${chave}`;
+  const resposta = await fetch(url);
+  if (!resposta.ok) return null;
+  const dados = await resposta.json();
+  if (dados.status !== "OK" || !dados.results?.length) return null;
+  const r = dados.results[0];
+  const tipo = r.geometry?.location_type;
+  if (tipo !== "ROOFTOP" && tipo !== "RANGE_INTERPOLATED") return null;
+  if (numeroAlvo) {
+    const componenteNumero = r.address_components?.find((c: { types: string[] }) => c.types.includes("street_number"));
+    if (!componenteNumero || apenasDigitos(componenteNumero.long_name) !== numeroAlvo) return null;
+  }
+  return { lat: r.geometry.location.lat, lng: r.geometry.location.lng };
+}
+
+// Orquestra: Nominatim (grátis) primeiro; só recorre ao Google quando o Nominatim não
+// resolveu até o número da casa. Se nenhum dos dois for preciso mas o Nominatim ao menos
+// devolveu algo não-genérico, mantém esse resultado — melhor um posto no mapa com posição
+// aproximada do que descartado (mesma lógica que motivou o sync-anp geocodificar em vez de
+// só descartar, ver ARQUITETURA.md seção 27.5).
+async function geocodificarEndereco(
+  endereco: string,
+  complemento: string,
+  municipio: string,
+  uf: string,
+  cep: string
+): Promise<{ lat: number; lng: number } | null> {
+  const numeroAlvo = extrairNumero(endereco, complemento);
+  const { resultado, candidato } = await consultarNominatim(endereco, municipio, uf, cep);
+
+  if (resultado && precisaoOk(candidato, numeroAlvo)) return resultado;
+
+  const google = await geocodificarGoogle(endereco, municipio, uf, numeroAlvo);
+  if (google) return google;
+
+  return resultado;
 }
 
 function montarLinhaPosto(registro: RegistroAnp, coordFallback?: { lat: number; lng: number }) {
@@ -187,6 +270,7 @@ Deno.serve(async (req) => {
           geocodificacoesFeitas++;
           const coord = await geocodificarEndereco(
             registro.endereco,
+            registro.complemento,
             registro.municipio,
             registro.uf,
             registro.cep
