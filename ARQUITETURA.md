@@ -995,3 +995,16 @@ Usuário reportou: logo que o app abre, o mapa demora pra ir pra localização/z
 Confirma a causa raiz na prática: sem o fix, o app ficaria ~4,4s parado até a primeira leitura de GPS; com o fix, centraliza numa posição real em ~425ms e só depois refina.
 
 **Achado operacional nesta sessão, pra não repetir**: o deep link `abastecai://expo-development-client/...` sem a flag `-p` no `adb shell am start` é ambíguo entre os dois apps instalados no device (`com.abastecai.app`, o de produção baixado da Play Store, e `com.abastecai.app.dev`, o dev client) — os dois registram o mesmo esquema de URL. Sem `-p`, o Android abriu **o app de produção por engano** (nenhum dano — não é destrutivo, só abriu/navegou normalmente — mas invalidou o primeiro teste, que teve que ser refeito). Sempre usar `adb shell am start ... -p com.abastecai.app.dev` explicitamente ao testar via deep link neste projeto.
+
+## 30. Build v15: fix de centralização + geocodificação corrigida (2026-09-07)
+
+`eas build --platform android --profile production --non-interactive`, versionCode 14→15 (auto-incrementado, `appVersionSource: remote`). `.aab` em `G:\dev\AbastecAI-builds\android\abastecai-production-v15.aab`.
+
+**Não testado via `bundletool`/sideload físico desta vez** — decisão consciente, diferente do ciclo v12-v14 (seção 28.3). Motivo: o device de teste (Galaxy A56) já tem `com.abastecai.app` instalado **de verdade pela Play Store** (`installerPackageName=com.android.vending`, hoje) — sideload de um `.aab` extraído com keystore de debug local causaria conflito de assinatura no mesmo `applicationId`, e forçar por cima (`adb uninstall`) é exatamente o erro da seção 21.2. Como o único código que efetivamente mudou no app (`app/src/lib/localizacao.ts`, `index.tsx`, `mapa.tsx` — seção 29) já foi validado rodando de verdade no dev client nesse mesmo device (mesmo bundle JS, só empacotado diferente pro `.aab`), o usuário optou por pular esse teste específico e ir direto pra Play Store.
+
+**O que está nesse build**: o fix de centralização lenta (seção 29). As correções de geocodificação (seção 27.7) são só backend/dados (Supabase + Edge Function) — não dependem de build novo do app, já estão em produção desde que foram commitadas.
+
+**Notas de versão sugeridas pro Play Console**:
+> Corrigido: o mapa agora centraliza na sua localização quase instantaneamente ao abrir o app — antes podia demorar alguns segundos logo na primeira abertura.
+>
+> Mais de 3 mil postos corrigidos no mapa: alguns apareciam na posição errada (às vezes sobrepostos a outro posto na mesma rua) por uma imprecisão na fonte de coordenadas.
