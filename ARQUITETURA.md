@@ -918,6 +918,20 @@ Script: `scripts/backfill-coordenadas-anp.js` — relê a API da ANP por UF (mes
 
 O `sync-anp` (seção 8) foi atualizado com a mesma lógica de fallback (sem `bairro`, desempate por CEP), limitada a 20 geocodificações por execução — cobre só o gotejamento diário de novos registros sem coordenada; o grosso do backlog já foi resolvido por este backfill único.
 
+### 27.7 Bug real descoberto pelo usuário: pin do Totalle sobreposto a 2 quarteirões do lugar certo (2026-09-07)
+
+Usuário reportou que o Totalle Auto Posto (número 327) aparecia sobreposto ao Auto Posto 36 Ltda (número 124), na mesma avenida, a pelo menos 2 quarteirões de distância real. Investigação confirmou: os dois pontos estavam a menos de 50m um do outro no banco.
+
+**Causa raiz**: pra esse trecho da Av. Padre Francisco Sales Colturato, o OpenStreetMap só tem o **segmento de rua inteiro mapeado**, sem numeração interpolada — o Nominatim devolve o mesmo ponto (o centro do segmento) pra qualquer número daquela rua, então dois postos com números bem diferentes (124 e 327) caem no mesmo lugar. A precisão "~230m do ponto real" registrada como aceitável na seção 27.6 era otimista — na prática, alguns casos ficam bem piores que isso quando o segmento de rua é longo.
+
+**Fix pontual**: corrigido manualmente via Google Geocoding (`ROOFTOP`, número conferido) — coordenada certa aplicada direto no banco pro CNPJ `25384281000154`.
+
+**Fix estrutural** (`scripts/backfill-coordenadas-anp.js` e `supabase/functions/sync-anp/index.ts`): o resultado do Nominatim só é aceito agora quando o `house_number` devolvido bate com o número extraído do endereço da ANP (`extrairNumero`); quando não bate, cai pro **Google Geocoding** como fallback (`GOOGLE_BACKEND_API_KEY`, mesma chave já usada em `enriquecer-google-posto`, restrição de API já cobria `geocoding-backend.googleapis.com`), só aceitando `ROOFTOP`/`RANGE_INTERPOLATED` com o `street_number` conferido. Se nenhum dos dois for preciso, mantém o resultado aproximado do Nominatim (não descarta o posto) — mesma filosofia da seção 27.5, só que agora com um "melhor esforço" antes de aceitar a imprecisão.
+
+**Custo**: cotado com o usuário antes de implementar — SKU Essentials do Google Geocoding, 10.000 chamadas grátis/mês, US$5/1.000 depois disso. Decisão: não substituir o Nominatim (que continua sendo tentado primeiro, de graça), só usar o Google como fallback condicional. Mesmo num cenário extremo de 100% do backlog nacional (~7.131 CNPJs) precisando do fallback, ficaria dentro da cota grátis.
+
+**Auditoria do backlog já processado** (`scripts/auditar-coordenadas-anp.js`, criado nesta sessão): revarre os mesmos ~7.131 CNPJs sem coordenada nativa da ANP, aplica a mesma checagem de precisão contra o Nominatim (consulta nova, já que o backfill original não guardou o metadado de precisão de cada registro) e só aciona o Google — corrigindo o `postos.localizacao` — nos casos que não bateram o número da casa. Gera dois relatórios locais (não versionados): `auditoria-coordenadas-corrigidos.csv` (o que o Google corrigiu de fato) e `auditoria-coordenadas-revisar.csv` (nenhum dos dois geocodificadores resolveu com precisão — candidatos a revisão manual, como era o caso do Totalle antes deste fix). Checkpoint em disco (`auditoria-coordenadas-progresso.json`), retomável. **Disparada em background nesta sessão (2026-09-07, ~12:40) — resultado final ainda não confirmado**; amostra inicial (AC+AL, 51 CNPJs) mostrou uma taxa de correção via Google bem mais alta do que o esperado (~29%, não uma fração pequena), o que ainda assim cabe na cota grátis.
+
 ## 28. Reorganização da ficha do posto + logo da bandeira + versão 12→14 (2026-09-05/06)
 
 Pedido do usuário depois de testar a v12 no device real (ver seção 27.4): reordenar as seções da ficha, tirar o CNPJ do topo, e mostrar o logo de verdade da bandeira em vez de só o texto/ícone genérico.
@@ -949,3 +963,24 @@ Todos os `.aab` ficam em `G:\dev\AbastecAI-builds\android\` (fora do repo, conve
 > Mais de 4.300 postos que não apareciam no mapa por falta de coordenada nos dados oficiais agora estão visíveis.
 >
 > A ficha de cada posto agora mostra nota, comentários, telefone e horário de funcionamento do Google, além do logo da bandeira (Petrobras, Ipiranga, Shell, Ale). Reorganizamos a ordem das informações pra facilitar achar o que importa primeiro.
+
+## 29. Botão de centralizar lento só na abertura do app (GPS "frio") (2026-09-07)
+
+Usuário reportou: logo que o app abre, o mapa demora pra ir pra localização/zoom certos; depois de aberto um tempo, fica quase instantâneo.
+
+**Causa raiz**: `obterLocalizacaoAtualConfiavel` (`src/lib/localizacao.ts`) força `Location.Accuracy.High` e rejeita qualquer leitura com erro acima de 100m — correção certa pro bug antigo de "teleportar pro lugar errado" (seção 21.1/26). O efeito colateral: essa exigência de alta precisão obriga a esperar o GPS travar nos satélites (*time to first fix*), que na primeira leitura depois do app abrir pode levar vários segundos — depois que já travou (GPS "quente"), as leituras seguintes voltam quase na hora. Os três pontos que centralizam na localização do usuário (mount inicial, onboarding, botão manual — nativo em `app/index.tsx` e web em `app/mapa.tsx`) usam essa mesma função, então os três sofriam do mesmo atraso na primeira chamada da sessão.
+
+**Fix**: `obterUltimaLocalizacaoRapida()` (novo, em `src/lib/localizacao.ts`) usa `Location.getLastKnownPositionAsync` — não pede um fix novo, só devolve o que o SO já tinha em cache, voltando quase instantâneo (mas pode ser `null` se nunca houve fix antes). Aplicado nos três pontos dos dois arquivos: centraliza rápido nessa posição (com um filtro de precisão bem mais frouxo, 3km, só pra barrar leitura visivelmente errada) assim que ela chega, e sem bloquear nada, continua esperando `obterLocalizacaoAtualConfiavel` pra centralizar de novo com a posição precisa quando ela chegar — sempre é essa última quem decide a posição final, a rápida é só um placeholder visual. Elimina a demora perceptível sem reintroduzir o bug antigo (a fonte final de verdade continua sendo a leitura de alta precisão).
+
+**Validado em device físico (Galaxy A56) no fluxo rápido da seção 21.4**, com `console.log` temporário nos dois pontos de `localizacao.ts` (removido depois de confirmar, não ficou no código):
+
+```
+13:20:20.259  pedindo última posição conhecida
+13:20:20.684  última posição conhecida chegou        (+425ms)
+13:20:20.695  pedindo posição precisa
+13:20:24.708  posição precisa chegou                 (+4.013ms, accuracy=16,75m)
+```
+
+Confirma a causa raiz na prática: sem o fix, o app ficaria ~4,4s parado até a primeira leitura de GPS; com o fix, centraliza numa posição real em ~425ms e só depois refina.
+
+**Achado operacional nesta sessão, pra não repetir**: o deep link `abastecai://expo-development-client/...` sem a flag `-p` no `adb shell am start` é ambíguo entre os dois apps instalados no device (`com.abastecai.app`, o de produção baixado da Play Store, e `com.abastecai.app.dev`, o dev client) — os dois registram o mesmo esquema de URL. Sem `-p`, o Android abriu **o app de produção por engano** (nenhum dano — não é destrutivo, só abriu/navegou normalmente — mas invalidou o primeiro teste, que teve que ser refeito). Sempre usar `adb shell am start ... -p com.abastecai.app.dev` explicitamente ao testar via deep link neste projeto.
