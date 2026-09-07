@@ -31,7 +31,7 @@ import { buscarPostosProximos, type PostoProximo } from "../src/lib/postos";
 import { buscarPontosRecargaProximos, type PontoRecargaProximo } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
-import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel } from "../src/lib/localizacao";
+import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel, obterUltimaLocalizacaoRapida } from "../src/lib/localizacao";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { PinMapa } from "../src/components/PinMapa";
@@ -189,11 +189,16 @@ export default function MapaScreen() {
     (async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === Location.PermissionStatus.GRANTED) {
+        // Centraliza rápido com a última posição conhecida (quase instantânea, GPS ainda não
+        // precisou travar) enquanto o fix preciso não chega — evita a demora perceptível logo
+        // na abertura do app. Ver comentário de obterUltimaLocalizacaoRapida.
+        const rapida = await obterUltimaLocalizacaoRapida();
+        if (rapida) irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
         try {
           const posicao = await obterLocalizacaoAtualConfiavel();
           irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
         } catch {
-          // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
+          // GPS indisponível etc. — mantém o centro (padrão ou o rápido acima) já carregado
         }
       } else {
         setMostrarOnboarding(true);
@@ -205,11 +210,13 @@ export default function MapaScreen() {
   async function irParaMinhaLocalizacao() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;
+    const rapida = await obterUltimaLocalizacaoRapida();
+    if (rapida) irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
     try {
       const posicao = await obterLocalizacaoAtualConfiavel();
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch {
-      setErro("Não consegui obter uma localização precisa agora.");
+      if (!rapida) setErro("Não consegui obter uma localização precisa agora.");
     }
   }
 
@@ -220,11 +227,13 @@ export default function MapaScreen() {
       return;
     }
     setMostrarOnboarding(false);
+    const rapida = await obterUltimaLocalizacaoRapida();
+    if (rapida) irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
     try {
       const posicao = await obterLocalizacaoAtualConfiavel();
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch {
-      setErro("Não consegui obter uma localização precisa agora.");
+      if (!rapida) setErro("Não consegui obter uma localização precisa agora.");
     }
   }
 

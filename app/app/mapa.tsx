@@ -44,7 +44,7 @@ import {
 } from "../src/lib/recarga";
 import { useFiltros } from "../src/lib/filtros";
 import { buscarCoordenadasPorCidade } from "../src/lib/geocoding";
-import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel } from "../src/lib/localizacao";
+import { ZOOM_LOCAL, obterLocalizacaoAtualConfiavel, obterUltimaLocalizacaoRapida } from "../src/lib/localizacao";
 import { buscarIdsPatrocinados } from "../src/lib/patrocinios";
 import { CardResultadoProximo, type ItemProximo } from "../src/components/CardResultadoProximo";
 import { FichaPosto } from "../src/components/FichaPosto";
@@ -329,12 +329,20 @@ export default function MapaWebScreen() {
     (async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === Location.PermissionStatus.GRANTED) {
+        // Centraliza rápido com a última posição conhecida (quase instantânea, GPS ainda não
+        // precisou travar) enquanto o fix preciso não chega — evita a demora perceptível logo
+        // na abertura do app. Ver comentário de obterUltimaLocalizacaoRapida.
+        const rapida = await obterUltimaLocalizacaoRapida();
+        if (rapida) {
+          definirMinhaLocalizacao({ lat: rapida.coords.latitude, lng: rapida.coords.longitude });
+          irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
+        }
         try {
           const posicao = await obterLocalizacaoAtualConfiavel();
           definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
           irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
         } catch {
-          // GPS indisponível etc. — mantém o centro padrão já carregado, sem travar a tela
+          // GPS indisponível etc. — mantém o centro (padrão ou o rápido acima) já carregado
         }
       } else {
         setMostrarOnboarding(true);
@@ -344,22 +352,32 @@ export default function MapaWebScreen() {
   }, []);
 
   async function irParaMinhaLocalizacao() {
+    let rapida: Awaited<ReturnType<typeof obterUltimaLocalizacaoRapida>> = null;
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setErro("Permissão de localização negada pelo navegador.");
         return;
       }
+      rapida = await obterUltimaLocalizacaoRapida();
+      if (rapida) {
+        definirMinhaLocalizacao({ lat: rapida.coords.latitude, lng: rapida.coords.longitude });
+        irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
+      }
       const posicao = await obterLocalizacaoAtualConfiavel();
       definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch (e) {
+      // Já temos uma posição (aproximada) na tela — só falhou o refino, não vale interromper
+      // com erro por cima do que já está mostrado.
+      if (rapida) return;
       const mensagem = (e as { message?: string })?.message || "Não consegui obter uma localização precisa agora.";
       setErro(mensagem);
     }
   }
 
   async function aoPermitirLocalizacaoOnboarding() {
+    let rapida: Awaited<ReturnType<typeof obterUltimaLocalizacaoRapida>> = null;
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -367,13 +385,19 @@ export default function MapaWebScreen() {
         return;
       }
       setMostrarOnboarding(false);
+      rapida = await obterUltimaLocalizacaoRapida();
+      if (rapida) {
+        definirMinhaLocalizacao({ lat: rapida.coords.latitude, lng: rapida.coords.longitude });
+        irParaCoordenada(rapida.coords.latitude, rapida.coords.longitude, ZOOM_LOCAL);
+      }
       const posicao = await obterLocalizacaoAtualConfiavel();
       definirMinhaLocalizacao({ lat: posicao.coords.latitude, lng: posicao.coords.longitude });
       irParaCoordenada(posicao.coords.latitude, posicao.coords.longitude, ZOOM_LOCAL);
     } catch {
       // Falha ao obter posição (GPS indisponível, timeout etc.) — mesma mensagem da negação
-      // explícita, já que daqui o usuário só tem mesmo a saída de digitar a cidade.
-      setPermissaoNegada(true);
+      // explícita, já que daqui o usuário só tem mesmo a saída de digitar a cidade. Se já
+      // temos a posição rápida, mantém ela (só falhou a leitura precisa, não a permissão).
+      if (!rapida) setPermissaoNegada(true);
     }
   }
 
