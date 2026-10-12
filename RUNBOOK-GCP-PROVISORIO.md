@@ -74,8 +74,8 @@ Não dá para garantir nada do lado do Google, mas:
 | 12/10 | Projeto `abastecai-app-prod` criado e ligado à conta 02 | ok |
 | 12/10 | 5 APIs habilitadas e 3 chaves criadas | ok, testadas |
 | 12/10 | Backup do `env.local` + troca das 3 chaves + `.gitignore` | ok |
-| | EAS: variáveis atualizadas | pendente |
-| | Supabase: secret `GOOGLE_BACKEND_API_KEY` | pendente |
-| | Vercel: variável web + redeploy | pendente |
-| | Build v16 | pendente |
+| 12/10 | EAS: `GOOGLE_MAPS_ANDROID_API_KEY` e `GOOGLE_MAPS_WEB_API_KEY` atualizadas em production, preview e development | ok |
+| 12/10 | Supabase: secret `GOOGLE_BACKEND_API_KEY` (Management API, HTTP 201) | ok |
+| 12/10 | Vercel: variável `GOOGLE_MAPS_WEB_API_KEY` + redeploy | **bloqueado**: o MCP e o CLI logados nesta máquina não têm acesso ao time `abastec-ai`. Fazer pelo painel (valor novo em `env.local`) |
+| 12/10 | Build v16 (versionCode 16, perfil production) | disparado: `37b5a466-3ecb-49e9-b0e4-09e74ed9b04c` |
 | | Subir v16 na Play | pendente (manual) |
