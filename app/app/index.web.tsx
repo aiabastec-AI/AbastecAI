@@ -18,10 +18,10 @@ const TOTAL_CIDADES = "4.850";
 const TOTAL_RECARGA = "1.659";
 const TOTAL_FISCALIZACOES = "53 mil+";
 
-// Trocar por um link real assim que existir (opt-in do teste fechado, ou a ficha pública
-// depois que o app sair de teste) — enquanto for null, o botão mostra "em breve" em vez de
-// link quebrado.
-const LINK_PLAY_STORE: string | null = null;
+// Ficha pública do app na Play Store (produção liberada em 2026-10-12). Se voltar a ser null,
+// os botões mostram "em breve" em vez de link quebrado.
+const LINK_PLAY_STORE: string | null =
+  "https://play.google.com/store/apps/details?id=com.abastecai.app";
 
 const FEATURES = [
   {
@@ -262,7 +262,7 @@ export default function LandingPage() {
       {/* BAIXE ONDE QUISER */}
       <View style={styles.secao}>
         <Text style={styles.tag}>Baixe onde quiser</Text>
-        <Text style={styles.secaoTitulo}>Web hoje, app quando quiser</Text>
+        <Text style={styles.secaoTitulo}>No navegador ou no Android</Text>
         <View style={styles.plataformas}>
           <View style={styles.plataformaCard}>
             <MaterialCommunityIcons name="web" size={28} color={colors.eletrico} />
