@@ -25,3 +25,15 @@ scripts/auditoria-coordenadas.log
 # Builds baixados da EAS (binários grandes, não fazem sentido versionar)
 *.aab
 *.apk
+
+# credenciais locais (o arquivo real se chama env.local, sem ponto)
+env.local
+env.local.bak-*
+
+# marketing: arquivos pesados ou pessoais (os textos e roteiros de social/ são versionados)
+assets/UCG/
+social/prints/
+social/brutos/
+social/output/**/*.mp4
+social/output/**/*.wav
+social/output/**/transcripts/

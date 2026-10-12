@@ -1,0 +1,67 @@
+{
+  "marca": "AbastecAI",
+  "handle": "@ai.abastece",
+  "formato_feed": {
+    "largura": 1080,
+    "altura": 1350
+  },
+  "cores": {
+    "bg": "#0D0F12",
+    "surface": "#171A1F",
+    "card": "#1E2126",
+    "border": "#262B33",
+    "white": "#FFFFFF",
+    "text": "#FFFFFF",
+    "muted": "#8A9099",
+    "combustivel": "#FF7A1A",
+    "eletrico": "#2FD9C4",
+    "nota_baixa": "#E5484D",
+    "nota_media": "#F5A623",
+    "nota_alta": "#3DD68C",
+    "nota_indisponivel": "#9AA1AB",
+    "logo_ai": "#00B4D6"
+  },
+  "cor_por_produto": {
+    "seguranca": "nota_alta",
+    "combustivel": "combustivel",
+    "eletrico": "eletrico"
+  },
+  "fontes": {
+    "display": "Space Grotesk 700/600 (títulos, métricas, labels em maiúsculas com tracking +1.2)",
+    "body": "Inter 400/600",
+    "fonte_da_regra": "app/src/typography.ts do próprio app"
+  },
+  "logos": {
+    "oficial": "arte do ícone do app (app/assets/icon.png): pino vermelho com bomba laranja e bateria turquesa sobre mapa azul/amarelo/verde",
+    "icone_app": "assets/logo-app-icon-1024.png",
+    "icone_transparente": "assets/logo-app-icone-transparente.png",
+    "vertical": "assets/logo-vertical.png",
+    "vertical_claro": "assets/logo-vertical-claro.png",
+    "regra": "usar sempre o PNG original; vertical = mesma arte do ícone + wordmark AbastecAI (AI em ciano), texto branco para fundo escuro; vertical_claro = texto escuro. Nunca pedir ao gerador de vídeo para desenhar o logo."
+  },
+  "fundo": "mapa 3D escuro (#0D0F12) com pins; glow laranja em combustível e turquesa em elétrico",
+  "estilos_feed": {
+    "rodizio": [
+      "A",
+      "B",
+      "C"
+    ],
+    "regra": "um carrossel inteiro fica no mesmo estilo; Reels seguem frame.md. Os arquivos css do template são da Scrin Dev e ainda NÃO foram adaptados ao AbastecAI.",
+    "A": {
+      "nome": "Mapa escuro",
+      "css": "assets/estilos/a-terminal.css",
+      "bom_para": "listas, passo a passo, como ler a nota"
+    },
+    "B": {
+      "nome": "Post de texto",
+      "css": "assets/estilos/b-post.css",
+      "bom_para": "frases que viram print, dica rápida"
+    },
+    "C": {
+      "nome": "Bloco gráfico",
+      "css": "assets/estilos/c-bloco.css",
+      "bom_para": "gancho forte, número grande, mockup do app"
+    },
+    "base": "assets/estilos/comum.css"
+  }
+}

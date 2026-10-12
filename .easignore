@@ -22,3 +22,12 @@ app/web-build/
 *.aab
 *.apk
 *.ipa
+
+# Material de marketing e credenciais locais (não fazem parte do app)
+social/
+RUNBOOK-GCP-PROVISORIO.md
+env.local
+env.local.bak-*
+*.mp4
+*.wav
+*.mov
