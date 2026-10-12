@@ -60,6 +60,17 @@ module.exports = {
           color: "#0D0F12",
         },
       ],
+      // Alerta do Play Console (v15): otimização de código DEX abaixo de 25% (ofuscação 1%).
+      // R8/ProGuard + remoção de recursos só nos builds de release. Prazo do Google: fev/2027.
+      [
+        "expo-build-properties",
+        {
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+          },
+        },
+      ],
     ],
     extra: {
       // Só valores seguros pro cliente: publishable key (não a secret) e a

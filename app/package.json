@@ -11,6 +11,7 @@
     "@vis.gl/react-google-maps": "^1.9.0",
     "expo": "~57.0.11",
     "expo-auth-session": "~57.0.6",
+    "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.9",
     "expo-dev-client": "~57.0.10",
     "expo-keep-awake": "~57.0.1",

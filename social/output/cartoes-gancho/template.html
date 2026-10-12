@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Space Grotesk"; src: url("../../../assets/fonts/SpaceGrotesk-Variable.ttf"); font-weight: 300 700; }
+  html, body { margin: 0; background: #0D0F12; }
+  #quadro { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #0D0F12; font-family: "Space Grotesk", sans-serif; }
+  .glow { position: absolute; border-radius: 50%; filter: blur(120px); }
+  #g1 { width: 760px; height: 760px; right: -240px; top: 120px; background: {{COR_A}}; opacity: .26; }
+  #g2 { width: 820px; height: 820px; left: -300px; bottom: 120px; background: {{COR_B}}; opacity: .22; }
+  svg.rua { position: absolute; inset: 0; }
+  .pin { position: absolute; width: 150px; height: 190px; }
+  #texto { position: absolute; left: 80px; top: 290px; width: 770px; }
+  #rotulo { font-weight: 700; font-size: 34px; letter-spacing: 5px; color: {{COR_B}}; text-transform: uppercase; margin-bottom: 26px; }
+  #titulo { font-weight: 700; font-size: {{FONTE}}px; line-height: 1.04; letter-spacing: -3px; color: #FFFFFF; }
+  #titulo .o { color: {{COR_A}}; }
+  #sub { margin-top: 52px; font-weight: 500; font-size: 46px; line-height: 1.3; color: #B8BEC7; }
+  #marca { position: absolute; left: 20px; top: 1060px; width: 860px; display: flex; align-items: center; }
+  #marca img { width: 400px; height: 400px; object-fit: contain; margin: -90px -60px -90px 0; }
+  #marca .nome { font-weight: 700; font-size: 88px; letter-spacing: -2px; color: #FFFFFF; }
+  #marca .nome span { color: #00B4D6; }
+  #marca .tag { font-weight: 500; font-size: 32px; color: #8A9099; letter-spacing: 1px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="quadro">
+  <div class="glow" id="g1"></div>
+  <div class="glow" id="g2"></div>
+  <svg class="rua" viewBox="0 0 1080 1920" fill="none" stroke="#262B33" stroke-width="3">
+    <path d="M-40 520 L1120 380"/><path d="M-40 1020 L1120 900"/><path d="M-40 1560 L1120 1480"/>
+    <path d="M180 -40 L260 1960"/><path d="M620 -40 L560 1960"/><path d="M960 -40 L900 1960"/>
+    <path d="M-40 260 L420 1960" stroke-opacity=".6"/>
+  </svg>
+  {{PINS}}
+  <div id="texto">
+    <div id="rotulo">{{ROTULO}}</div>
+    <div id="titulo">{{TITULO}}</div>
+    <div id="sub">{{SUB}}</div>
+  </div>
+  <div id="marca">
+    <img src="../../../assets/logo-app-icone-transparente.png" alt="">
+    <div>
+      <div class="nome">Abastec<span>AI</span></div>
+      <div class="tag">Combustível e elétrico no mesmo mapa</div>
+    </div>
+  </div>
+</div>
+<script>
+  window.META = { W: 1080, H: 1920, FPS: 30, DURATION: 3 };
+  const pins = Array.from(document.querySelectorAll(".pin"));
+  function render(t) {
+    pins.forEach((p, i) => {
+      p.style.transform = `translateY(${Math.sin(t * 2.2 + i * 1.7) * 14}px) rotate(${Math.sin(t * 1.4 + i) * 3}deg)`;
+    });
+  }
+  render(0);
+  Promise.all([document.fonts.load('700 100px "Space Grotesk"'), document.fonts.load('500 40px "Space Grotesk"'),
+    ...Array.from(document.images).map(im => im.decode ? im.decode().catch(() => {}) : null)])
+    .then(() => { window.READY = true; });
+</script>
+</body>
+</html>
