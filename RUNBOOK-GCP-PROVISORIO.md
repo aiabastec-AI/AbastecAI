@@ -78,4 +78,41 @@ Não dá para garantir nada do lado do Google, mas:
 | 12/10 | Supabase: secret `GOOGLE_BACKEND_API_KEY` (Management API, HTTP 201) | ok |
 | 12/10 | Vercel: variável `GOOGLE_MAPS_WEB_API_KEY` + redeploy | **bloqueado**: o MCP e o CLI logados nesta máquina não têm acesso ao time `abastec-ai`. Fazer pelo painel (valor novo em `env.local`) |
 | 12/10 | Build v16 (versionCode 16, perfil production) | disparado: `37b5a466-3ecb-49e9-b0e4-09e74ed9b04c` |
+| 12/10 | Build v16 concluído (AAB gerado) | ok, aguardando upload manual na Play |
+| 12/10 | Notas da versão 16 redigidas (ver seção 9) | ok |
+| 12/10 | Alertas do Play Console (v15): R8/ProGuard + remoção de recursos adicionados em `app.config.js` (commit local `22d3944`) | feito no código |
+| 12/10 | Build v17 (com R8) | disparado: `ab7435d3-c749-445b-bc18-a71945a2576a`, **não testado** |
 | | Subir v16 na Play | pendente (manual) |
+| | Testar v17 antes de publicar (ver seção 10) | pendente |
+
+## 9. Notas da versão 16 (Play Console, pt-BR)
+
+```
+<pt-BR>
+Corrigido: o mapa voltou a carregar corretamente. Em algumas instalações o mapa aparecia em branco, mostrando só os pins dos postos.
+
+Também atualizamos a conexão com os serviços de mapa e rota para deixar o app mais estável.
+</pt-BR>
+```
+
+- A v16 só troca as chaves do Google Maps (projeto provisório). Não tem recurso novo; não prometer nada além disso.
+- Se a v15 ainda estiver "em análise", o envio da v16 pode substituí-la. Conferir no painel antes.
+
+## 10. Alertas do Play Console e v17 (R8)
+
+| Alerta | Situação |
+|---|---|
+| Otimização de código DEX abaixo de 25% (ofuscação 1%) | Tratado na v17: `enableProguardInReleaseBuilds` + `enableShrinkResourcesInReleaseBuilds` via `expo-build-properties` (`~57.0.22`). Prazo do Google: fev/2027. |
+| Avisos de edge-to-edge | Vêm de bibliotecas; sem correção direta no app. Acompanhar atualizações do Expo/React Native. |
+| Orientação em tablets/dobráveis | Mantido `portrait` de propósito. |
+
+**Risco da v17:** R8 pode remover classes usadas por reflexão e quebrar o app só em release. Não publicar em produção sem testar.
+
+**Checklist de teste da v17** (instalar o AAB/APK em aparelho ou emulador, ou na faixa de teste fechado):
+1. Abre sem fechar sozinho e o mapa carrega com pins.
+2. Alternar Combustível / Elétrico / Ambos.
+3. Abrir a ficha de um posto.
+4. Filtros (nota mínima, conector).
+5. Traçar rota e iniciar navegação com voz.
+6. Login com Google, favoritar um posto e voltar (pendência: novo OAuth client, seção 7).
+7. Se algo quebrar: reverter `expo-build-properties` em `app.config.js` e seguir com a v16.
