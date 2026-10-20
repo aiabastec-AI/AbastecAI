@@ -63,7 +63,7 @@ Não dá para garantir nada do lado do Google, mas:
 - Considerar um e-mail institucional (Workspace) como dono, para não depender de Gmail pessoal.
 
 ## 7. Pendências conhecidas
-- **Login Google (OAuth)**: o client OAuth (`GOOGLE_OAUTH_CLIENT_ID`) foi criado no projeto antigo. Se ele estiver bloqueado junto, favoritos/avaliações/preço não funcionam. Precisa de novo client no projeto novo, criado **pelo console** (tela de consentimento + client Web), e atualização no provedor Google do Supabase. Não verificado ainda.
+- **Login Google (OAuth)**: verificado em 20/10. O provider está ativo no Supabase com o client `273529280541-qos37...` e o Google aceita o client (a tela de login abre, sem erro de client apagado/desativado). Esse client pertence a um projeto da conta `aiabastec@gmail.com` (nº 273529280541, distinto do `abastecai`/641453240095), que `chicolicia` não enxerga. Pendente apenas um teste de login real num aparelho; se um dia o Google bloquear esse projeto, criar client novo no `abastecai-app-prod` pelo console.
 - ~~Mapa web depende do redeploy na Vercel~~ — resolvido em 20/10.
 - ~~Push travado por permissão~~ — resolvido em 20/10 com `GITHUB_TOKEN` no `env.local`.
 
