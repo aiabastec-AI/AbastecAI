@@ -53,7 +53,7 @@ Nenhuma chave real fica neste arquivo nem em código commitado. Tudo em `.env.lo
 - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` — projeto Supabase dedicado ao AbastecAI (`qefkolxhktkzryzcvnfq`). **A `SECRET_KEY` nunca deve ir pro app mobile** — só serve pra Edge Functions/backend, que rodam fora do bundle do cliente.
 - `VERCEL_PROJECT_ID`, `VERCEL_ORG_ID` — projeto Vercel reservado pro `admin/` (`abastec-ai.vercel.app`); o app público tem seu próprio projeto separado, ver seção 14.4.
 - `GOOGLE_MAPS_ANDROID_API_KEY`, `GOOGLE_MAPS_IOS_API_KEY`, `GOOGLE_MAPS_WEB_API_KEY` — 3 chaves separadas (projeto GCP `abastecai`, conta `aiabastec@gmail.com`), cada uma restrita por API (Maps SDK Android/iOS/JS) **e** por aplicativo desde 2026-08-09 (Android por `package_name`+SHA-1 do keystore de debug, iOS por bundle ID, Web por `allowedReferrers`) — ver seção 14.1. `MAPBOX_ACCESS_TOKEN`/`RNMAPBOX_MAPS_DOWNLOAD_TOKEN` ficaram só como resíduo histórico no `.env.local`, não são mais usados em nenhum código.
-- Google Cloud SDK (`gcloud`) instalado nesta máquina em `C:\Users\gabon\dev-tools\google-cloud-sdk\google-cloud-sdk\bin\gcloud.cmd` — não está no PATH, sempre chamar pelo caminho absoluto.
+- Google Cloud SDK (`gcloud`) reinstalado em 2026-10-20 em `C:SERSGABONAPPDATAocalgooglecloud sdkgoogle-cloud-sdkbin` — j� est� no path (o caminho antigo em `dev-tools` n�o existe mais). logado como `chicolicia@gmail.com`.
 
 `app/app.config.js` é uma **config dinâmica** (não `app.json` estático): ele faz `dotenv.config()` apontando pro `.env.local` da raiz (com um segundo `dotenv.config()` apontando pro `.env` **dentro de** `app/` como fallback, pra deploys "achatados" tipo Vercel que só sobem essa pasta), e separa os dois mundos:
 - **Client-safe** (`extra` do Expo config → lido em runtime via `expo-constants`): `supabaseUrl`, `supabasePublishableKey`, `googleMapsWebApiKey`.
@@ -1008,3 +1008,16 @@ Confirma a causa raiz na prática: sem o fix, o app ficaria ~4,4s parado até a 
 > Corrigido: o mapa agora centraliza na sua localização quase instantaneamente ao abrir o app — antes podia demorar alguns segundos logo na primeira abertura.
 >
 > Mais de 3 mil postos corrigidos no mapa: alguns apareciam na posição errada (às vezes sobrepostos a outro posto na mesma rua) por uma imprecisão na fonte de coordenadas.
+
+## 31. Projeto GCP provisório, v16 e credenciais por projeto (2026-10-12 a 2026-10-20)
+
+Detalhe operacional completo em `RUNBOOK-GCP-PROVISORIO.md`. Resumo:
+
+- **Incidente (12/10)**: o projeto GCP `abastecai` (conta `aiabastec@gmail.com`) foi bloqueado pelo Google junto com a conta, e o mapa da v15 ficou em branco. Criado o projeto `abastecai-app-prod` (mesma conta de faturamento) com 3 chaves novas (Android, Web, Backend). **A partir daqui, o projeto GCP em uso é `abastecai-app-prod`**, onde o texto acima diz `abastecai`.
+- **Donos do projeto novo (2026-10-20)**: `aiabastec@gmail.com` (conta oficial) e `chicolicia@gmail.com` (segunda dona). Dono Gmail só entra por convite aceito por e-mail — `gcloud add-iam-policy-binding` falha com `SOLO_MUST_INVITE_OWNERS`. Não exigiu build novo (ID do projeto e chaves não mudaram).
+- **v16** (chaves novas, sem recurso novo) foi gerada em 12/10 e publicada na Play pelo usuário. **v17** (R8/shrink) gerada, **ainda não testada nem publicada**.
+- **Vercel (2026-10-20)**: `GOOGLE_MAPS_WEB_API_KEY` do projeto `app` (time `abastec-ai`) trocada em Production e Preview e feito deploy de produção; confirmado que o bundle no ar tem a chave nova. Deploy pela CLI deve rodar **da raiz do repo** (o projeto Vercel tem *Root Directory* = `app`; rodar de dentro de `app/` dá `package.json ... does not exist`).
+- **Credenciais por projeto (não usar CLI global logada)**: tudo vive no `env.local` da raiz (fora do git). `VERCEL_TOKEN` (usar com `--scope abastec-ai`) e `GITHUB_TOKEN` (conta `aiabastec-AI`, dona do repo). Push sem depender do `gh` global (logado como `trafego8Engage`, só leitura aqui):
+  `git -c credential.helper= -c http.extraheader="Authorization: Basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)" push origin main`.
+  O PAT fine-grained precisa de **Contents: Read and write**; regenerar o token invalida o anterior.
+- Os 5 commits locais de 12/10 foram enviados ao GitHub em 2026-10-20.

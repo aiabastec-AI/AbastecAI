@@ -64,8 +64,8 @@ Não dá para garantir nada do lado do Google, mas:
 
 ## 7. Pendências conhecidas
 - **Login Google (OAuth)**: o client OAuth (`GOOGLE_OAUTH_CLIENT_ID`) foi criado no projeto antigo. Se ele estiver bloqueado junto, favoritos/avaliações/preço não funcionam. Precisa de novo client no projeto novo, criado **pelo console** (tela de consentimento + client Web), e atualização no provedor Google do Supabase. Não verificado ainda.
-- Mapa web depende do redeploy na Vercel com a chave web nova.
-- Push do commit da landing (`d7ac196`) travado por permissão do GitHub (`trafego8Engage` sem acesso ao repositório da org).
+- ~~Mapa web depende do redeploy na Vercel~~ — resolvido em 20/10.
+- ~~Push travado por permissão~~ — resolvido em 20/10 com `GITHUB_TOKEN` no `env.local`.
 
 ## 8. Registro de progresso
 
@@ -82,7 +82,10 @@ Não dá para garantir nada do lado do Google, mas:
 | 12/10 | Notas da versão 16 redigidas (ver seção 9) | ok |
 | 12/10 | Alertas do Play Console (v15): R8/ProGuard + remoção de recursos adicionados em `app.config.js` (commit local `22d3944`) | feito no código |
 | 12/10 | Build v17 (com R8) | disparado: `ab7435d3-c749-445b-bc18-a71945a2576a`, **não testado** |
-| | Subir v16 na Play | pendente (manual) |
+| 12/10+ | Subir v16 na Play | feito pelo usuário |
+| 20/10 | Vercel: chave web trocada (prod+preview) + deploy de produção | ok, bundle confirmado com a chave nova |
+| 20/10 | Push dos 5 commits ao GitHub (`GITHUB_TOKEN` no `env.local`) | ok |
+| 20/10 | `aiabastec@gmail.com` adicionada como dona do `abastecai-app-prod` (convite aceito); `chicolicia` segue dona | ok, confirmado via gcloud |
 | | Testar v17 antes de publicar (ver seção 10) | pendente |
 
 ## 9. Notas da versão 16 (Play Console, pt-BR)
