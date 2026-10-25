@@ -86,7 +86,7 @@ Não dá para garantir nada do lado do Google, mas:
 | 20/10 | Vercel: chave web trocada (prod+preview) + deploy de produção | ok, bundle confirmado com a chave nova |
 | 20/10 | Push dos 5 commits ao GitHub (`GITHUB_TOKEN` no `env.local`) | ok |
 | 20/10 | `aiabastec@gmail.com` adicionada como dona do `abastecai-app-prod` (convite aceito); `chicolicia` segue dona | ok, confirmado via gcloud |
-| | Testar v17 antes de publicar (ver seção 10) | pendente |
+| 25/10 | Teste da v17 (versionCode 17) no Galaxy A56 via APK universal com keystore local de teste; SHA-1 de teste somado à chave Android durante o teste e removido depois (chave voltou aos 3 originais) | **aprovada**: abre sem crash, mapa/pins, filtros Combustível/Elétrico, ficha, nota mínima, rota, navegação com voz, login Google e favoritar/desfavoritar. Falta só subir o AAB na Play |
 
 ## 9. Notas da versão 16 (Play Console, pt-BR)
 

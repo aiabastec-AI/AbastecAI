@@ -2,6 +2,38 @@
 
 Nota rápida pra mim mesmo (Claude) na próxima sessão. `ARQUITETURA.md` é a fonte permanente de verdade (seções 14 e 15 têm o detalhe técnico completo do que foi feito hoje) — este arquivo aqui é só um resumo de trabalho, sempre confira o `ARQUITETURA.md` pro detalhe real.
 
+## ESTADO ATUAL — 2026-10-25 (leia esta seção primeiro; as de agosto abaixo são histórico)
+
+Resumo de 30/08 a 20/10. Detalhe técnico: `ARQUITETURA.md` seções 20 a 31 e `RUNBOOK-GCP-PROVISORIO.md`.
+
+**Produto**
+- App em **produção no Play** (link na landing). Landing redesenhada e domínio próprio `abastecai.digitaleducacao.com.br` (seção 20); `app-two-wine-64.vercel.app` segue funcionando em paralelo.
+- Mapa: clustering removido de vez (seção 23); tentativas de pin variável por zoom foram revertidas (seções 21 e 25); filtro quebrado corrigido e paridade web (26); verificação visual por screenshot via `adb` é o método principal de teste (22).
+- Dados: 109 concessionárias GWM adicionadas como pontos de recarga (24); enriquecimento com dados públicos do Google — nota, avaliações, telefone, site, horário (27); ficha reorganizada e logo da bandeira (28); centralização do GPS "frio" corrigida (29); geocodificação com fallback do Google (30).
+- Builds: v6 (29/08) → v12-v14 → **v15** (07/09) → **v16** (12/10, publicada no Play pelo usuário) → **v17** (12/10, R8/shrink, ainda não testada).
+
+**Incidente GCP (12/10)**: a conta `aiabastec@gmail.com` foi desativada pelo Google e o projeto `abastecai` bloqueado; o mapa da v15 ficou em branco. Criado o projeto **`abastecai-app-prod`** (mesma conta de faturamento 02), com 3 chaves novas (Android, Web, Backend). **É o projeto em uso a partir daqui.** Resolvido:
+- Chaves trocadas em `env.local`, EAS (3 ambientes), Supabase (secret) e Vercel (prod+preview, deploy feito em 20/10).
+- `aiabastec@gmail.com` aceitou o convite e é dona do projeto novo; `chicolicia@gmail.com` segue dona (conferido via `gcloud` em 25/10).
+- `.gitignore` corrigido (o `env.local` real não estava listado).
+- Push ao GitHub e deploy Vercel por token local no `env.local` (`GITHUB_TOKEN`, `VERCEL_TOKEN`); detalhe na seção 31. Deploy da Vercel roda da raiz do repo.
+- Login Google (OAuth): provider ativo, redirects certos, Google aceita o client (verificado 20/10). **Login ponta a ponta num aparelho ainda não foi reconfirmado.** O client pertence a um projeto da conta `aiabastec` (nº 273529280541); se for bloqueado, criar client novo no `abastecai-app-prod` e atualizar o provider no Supabase.
+
+**Play Console**: alerta de DEX (ofuscação 1%, prazo fev/2027) tratado na v17 via `expo-build-properties` (R8 + shrink). Edge-to-edge vem de bibliotecas; orientação `portrait` mantida de propósito.
+
+**Marketing**: vídeo UGC via muapi foi abandonado (qualidade insuficiente; não retomar sem pedido). `social/` do AbastecAI e roteiros v2 de dores reais estão commitados.
+
+## PRÓXIMOS PASSOS (em ordem)
+
+1. **Publicar a v17** (build `ab7435d3`, AAB em `BUILD/abastecai-production-v17.aab`). **Testada em 25/10 no Galaxy A56 e aprovada** (checklist completo da seção 10 do runbook, incluindo login Google ponta a ponta). Falta só subir o AAB no Play Console e reinstalar pela Play (o celular de teste está com a v17 de teste, assinada localmente, e precisa ser desinstalada antes).
+2. ~~Reconfirmar o login Google ponta a ponta~~ — feito em 25/10 na v17.
+3. Alerta de orçamento na conta de faturamento — não confirmado se existe.
+4. Quando a conta oficial estiver estável: trocar nos textos do `ARQUITETURA.md` (14.1, 18, 19.8) o projeto `abastecai` por `abastecai-app-prod` e decidir se desliga o projeto antigo.
+5. Revisar termos do Geocoding antes de novo backfill (todo o gasto do ano foi Geocoding; causa do bloqueio não confirmada).
+6. Itens menores: navegação em movimento com GPS real num aparelho; chave iOS ainda com valor antigo (só importa se houver versão iOS); `eas submit` não configurado (envio ao Play é manual).
+
+**Obsoleto (pode ignorar)**: as listas "O que falta" das seções de agosto abaixo — o `.aab` v6 já foi substituído, a faixa de teste já foi aprovada e a produção liberada, e o caminho `G:\dev\AbastecAI-builds\android\` não existe mais (o `abastecai-production-v16.aab` está em `BUILD/`). Confirmação de e-mail ficou sem sentido com login só-Google.
+
 ## Atualização — 2026-08-11 (rota in-app no nativo)
 
 Pedido do usuário: comparar o mapa nativo com o web e portar o que faltasse. Achado (ver ARQUITETURA.md 15.9): pins redondos e blue dot **já estavam OK** no nativo (a suposição de que faltavam era desatualizada); só a rota in-app faltava de verdade. Implementado (detalhe técnico completo em ARQUITETURA.md 15.10/15.11):
