@@ -23,6 +23,8 @@ Resumo de 30/08 a 20/10. Detalhe técnico: `ARQUITETURA.md` seções 20 a 31 e `
 
 **Marketing**: vídeo UGC via muapi foi abandonado (qualidade insuficiente; não retomar sem pedido). `social/` do AbastecAI e roteiros v2 de dores reais estão commitados.
 
+**Pontos de recarga (25/10)**: o `sync-ocm` agora grava o `Title` da OCM como `nome` (antes era o endereço, e o app mostrava só "Rodovia Washington Luís"). Nova coluna `pontos_recarga.ultima_verificacao` (`DateLastVerified`); migration `20261025120000` aplicada em produção, função redeployada e sync rodado (1.927 pontos). **Pendente:** mostrar "verificado em AAAA" na ficha (precisa de build novo, v18) — 311 pontos têm verificação com mais de 2 anos. Investigado o carregador Enel X de 150 kW de Araraquara (`ocm_id 264457`, "Posto BR - Pau Seco", cadastro de 2023 nunca reverificado): o Google lista no mesmo posto uma estação EZVolt (2×CCS 90 kW + 1×Tipo 2 7 kW), então o dado da Enel X provavelmente está defasado. Coordenada no posto segundo Google e OSM (6–8 m); o usuário relata que o pin cai numa rotatória, **não confirmado** — comparar visualmente.
+
 ## PRÓXIMOS PASSOS (em ordem)
 
 1. **Publicar a v17** (build `ab7435d3`, AAB em `BUILD/abastecai-production-v17.aab`). **Testada em 25/10 no Galaxy A56 e aprovada** (checklist completo da seção 10 do runbook, incluindo login Google ponta a ponta). Falta só subir o AAB no Play Console e reinstalar pela Play (o celular de teste está com a v17 de teste, assinada localmente, e precisa ser desinstalada antes).

@@ -16,9 +16,11 @@ interface ConexaoOcm {
 interface PoiOcm {
   ID: number;
   UUID: string;
+  DateLastVerified?: string | null;
   AddressInfo?: {
     Latitude: number;
     Longitude: number;
+    Title?: string;
     AddressLine1?: string;
     Town?: string;
     StateOrProvince?: string;
@@ -110,7 +112,9 @@ function montarLinhaPonto(poi: PoiOcm, redeId: string | null) {
   return {
     ocm_id: String(poi.ID),
     rede_id: redeId,
-    nome: endereco.AddressLine1 || poi.OperatorInfo?.Title || "Ponto de recarga",
+    // `Title` é o nome do local ("Posto BR - Pau Seco"); sem ele o app só mostrava o endereço
+    // ("Rodovia Washington Luís") e o usuário não reconhecia o ponto.
+    nome: endereco.Title?.trim() || endereco.AddressLine1 || poi.OperatorInfo?.Title || "Ponto de recarga",
     endereco: endereco.AddressLine1 || null,
     cidade: endereco.Town || null,
     uf: normalizarUf(endereco.StateOrProvince),
@@ -120,6 +124,7 @@ function montarLinhaPonto(poi: PoiOcm, redeId: string | null) {
     status: normalizarStatus(poi),
     fonte: "open_charge_map",
     ultima_sincronizacao: new Date().toISOString(),
+    ultima_verificacao: poi.DateLastVerified ?? null,
   };
 }
 
